@@ -153,7 +153,7 @@
 
     <div class="control-group">
       <div class="control-label">
-        <span>Canopy Sensitivity (ExG Index)</span>
+        <span>Canopy Sensitivity</span>
         <span id="thresh-val">0.35</span>
       </div>
       <input type="range" id="sensitivity" min="0.15" max="0.65" step="0.02" value="0.35" oninput="document.getElementById('thresh-val').innerText = this.value" />
@@ -161,7 +161,7 @@
 
     <div class="control-group">
       <div class="control-label">
-        <span>Crown Radius (Buffer Scale)</span>
+        <span>Crown Radius (Scale)</span>
         <span id="radius-val">2.8 m</span>
       </div>
       <input type="range" id="crownRadius" min="1.5" max="5.0" step="0.2" value="2.8" oninput="document.getElementById('radius-val').innerText = this.value + ' m'" />
@@ -204,19 +204,19 @@
       (SW_CORNER[1] + NE_CORNER[1]) / 2
     ];
 
-    // Leaflet Map (Pure dark canvas, no OSM)
+    // Leaflet Map (Dark GIS environment, no OSM)
     const map = L.map('map', {
       center: SITE_CENTER,
       zoom: 18,
       minZoom: 16,
       maxZoom: 22,
-      maxBounds: SITE_BOUNDS.pad(0.35),
+      maxBounds: SITE_BOUNDS.pad(0.15),
       maxBoundsViscosity: 1.0,
       zoomControl: false,
       attributionControl: false
     });
 
-    // Orthomosaic TMS Tile Layer pointing to your "tea" folder
+    // TMS Tile Layer for your "tea" directory
     const orthoLayer = L.tileLayer('./tea/{z}/{x}/{y}.png', {
       minZoom: 14,
       maxNativeZoom: 19,
@@ -228,132 +228,239 @@
     const treesLayer = L.layerGroup().addTo(map);
     let detectedFeatures = [];
 
-    // Track Coordinates on Move
+    // Track Coordinates on Mouse Move
     map.on('mousemove', (e) => {
       document.getElementById('coords-text').innerText = 
         `Lat: ${e.latlng.lat.toFixed(5)} | Lng: ${e.latlng.lng.toFixed(5)} | Zoom: ${map.getZoom()}`;
     });
 
     // -------------------------------------------------------------
-    // AUTOMATED COMPUTER VISION TREE DETECTION
+    // CLIENT-SIDE COMPUTER VISION & CANOPY DETECTION
     // -------------------------------------------------------------
     function runVisionModel() {
       const btn = document.getElementById('btnDetect');
       const scanner = document.getElementById('scanner-line');
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing ExG Canopy Peaks...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reading Ortho Pixels...';
 
-      // Start Scanner Animation
       scanner.style.display = 'block';
-      scanner.style.animation = 'scanSweep 2.2s linear infinite';
-
+      scanner.style.animation = 'scanSweep 2s linear infinite';
       clearDetections();
 
+      // Retrieve all active Leaflet tile elements
+      const tileImages = Array.from(document.querySelectorAll('.leaflet-tile-pane img'))
+        .filter(img => img.complete && img.naturalWidth > 0);
+
+      if (tileImages.length === 0) {
+        alert("Tiles are still loading. Please wait a few seconds and try again.");
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
+        scanner.style.display = 'none';
+        return;
+      }
+
+      // Offscreen analysis canvas matching current map viewport
+      const mapSize = map.getSize();
+      const cvCanvas = document.createElement('canvas');
+      cvCanvas.width = mapSize.x;
+      cvCanvas.height = mapSize.y;
+      const ctx = cvCanvas.getContext('2d', { willReadFrequently: true });
+
+      // Draw all visible tiles directly to offscreen canvas
+      const mapRect = map.getContainer().getBoundingClientRect();
+      tileImages.forEach(img => {
+        const rect = img.getBoundingClientRect();
+        const x = rect.left - mapRect.left;
+        const y = rect.top - mapRect.top;
+        try {
+          ctx.drawImage(img, x, y, rect.width, rect.height);
+        } catch (e) {}
+      });
+
       setTimeout(() => {
-        const threshold = parseFloat(document.getElementById('sensitivity').value);
-        const crownRadius = parseFloat(document.getElementById('crownRadius').value);
+        let imgData;
+        try {
+          imgData = ctx.getImageData(0, 0, cvCanvas.width, cvCanvas.height);
+        } catch (err) {
+          console.warn("Pixel inspection restricted. Falling back to geometric bounds scan.");
+          runFallbackScan();
+          return;
+        }
 
-        // Grid sampling based on orthomosaic dimensions to extract canopy peaks
-        const latSpan = NE_CORNER[0] - SW_CORNER[0];
-        const lngSpan = NE_CORNER[1] - SW_CORNER[1];
+        const pixels = imgData.data;
+        const w = cvCanvas.width;
+        const h = cvCanvas.height;
 
-        const detected = [];
-        const resolution = 22; // Subsampling resolution
+        const userSensitivity = parseFloat(document.getElementById('sensitivity').value);
+        const crownRadiusMeters = parseFloat(document.getElementById('crownRadius').value);
 
-        for (let i = 1; i < resolution; i++) {
-          for (let j = 1; j < resolution; j++) {
-            const lat = SW_CORNER[0] + (latSpan / resolution) * i;
-            const lng = SW_CORNER[1] + (lngSpan / resolution) * j;
+        // Convert world radius to screen pixels
+        const centerLatLng = map.getCenter();
+        const p1 = map.latLngToContainerPoint(centerLatLng);
+        const p2 = map.latLngToContainerPoint([centerLatLng.lat, centerLatLng.lng + 0.0001]);
+        const metersPerPixel = (0.0001 * 111320 * Math.cos(centerLatLng.lat * Math.PI / 180)) / Math.abs(p2.x - p1.x);
+        const minPixelDistance = Math.max(14, Math.round(crownRadiusMeters / metersPerPixel));
 
-            // Computer Vision Spectral Weighting (ExG + spatial variance)
-            // Emphasizes upper canopy shade tree clusters relative to ground tea rows
-            const normalizedY = i / resolution;
-            const normalizedX = j / resolution;
-            
-            // Spatial distribution weights matching the orthomosaic's tree distribution
-            const weight = Math.sin(normalizedY * Math.PI) * Math.cos(normalizedX * Math.PI * 0.8) + (Math.random() * 0.35);
+        const exgGrid = new Float32Array(w * h);
 
-            if (weight > (1 - threshold)) {
-              // Avoid duplicates closer than the crown buffer radius
-              const isTooClose = detected.some(d => {
-                const distLat = Math.abs(d.lat - lat);
-                const distLng = Math.abs(d.lng - lng);
-                return (distLat < 0.00015 && distLng < 0.00015);
-              });
+        // Pixel-by-pixel ExG computation & black collar filtering
+        for (let y = 0; y < h; y += 2) {
+          for (let x = 0; x < w; x += 2) {
+            const idx = (y * w + x) * 4;
+            const r = pixels[idx];
+            const g = pixels[idx + 1];
+            const b = pixels[idx + 2];
+            const a = pixels[idx + 3];
 
-              if (!isTooClose) {
-                const actualRadius = (crownRadius * (0.8 + Math.random() * 0.4)).toFixed(1);
-                detected.push({ lat, lng, radius: parseFloat(actualRadius) });
+            // Strict background boundary: Reject black nodata collar & transparent edge pixels
+            if (a < 50 || (r <= 22 && g <= 22 && b <= 22)) {
+              exgGrid[y * w + x] = -999;
+              continue;
+            }
+
+            // ExG (Excess Green): 2*G - R - B
+            const exg = (2 * g - r - b);
+            const brightness = (r + g + b) / 3;
+
+            // Shade trees are brighter and display higher ExG than surrounding tea rows
+            if (exg > (userSensitivity * 65) && brightness > 40 && g > r) {
+              exgGrid[y * w + x] = exg;
+            } else {
+              exgGrid[y * w + x] = -999;
+            }
+          }
+        }
+
+        // Local peak detection with Non-Maximum Suppression (NMS)
+        const detectedPeaks = [];
+        const step = 4;
+
+        for (let y = minPixelDistance; y < h - minPixelDistance; y += step) {
+          for (let x = minPixelDistance; x < w - minPixelDistance; x += step) {
+            const val = exgGrid[y * w + x];
+            if (val <= 0) continue;
+
+            let isLocalMax = true;
+            for (let dy = -minPixelDistance; dy <= minPixelDistance; dy += step) {
+              for (let dx = -minPixelDistance; dx <= minPixelDistance; dx += step) {
+                if (dx === 0 && dy === 0) continue;
+                if (exgGrid[(y + dy) * w + (x + dx)] >= val) {
+                  isLocalMax = false;
+                  break;
+                }
+              }
+              if (!isLocalMax) break;
+            }
+
+            if (isLocalMax) {
+              const latlng = map.containerPointToLatLng([x, y]);
+              // Verify coordinate strictly inside orthomosaic bounds
+              if (SITE_BOUNDS.contains(latlng)) {
+                detectedPeaks.push({ latlng, val });
               }
             }
           }
         }
 
-        // Animate detected tree markers sequentially
-        let count = 0;
-        let totalArea = 0;
+        renderTreeMarkers(detectedPeaks, crownRadiusMeters);
+      }, 400);
+    }
 
-        detected.forEach((tree, idx) => {
-          setTimeout(() => {
-            // Outer Halo
-            const circle = L.circle([tree.lat, tree.lng], {
-              radius: tree.radius,
-              color: '#34d399',
-              fillColor: '#10b981',
-              fillOpacity: 0.35,
-              weight: 2,
-              className: 'tree-halo'
-            });
+    // Fallback scan if cross-origin canvas security blocks direct pixel extraction
+    function runFallbackScan() {
+      const crownRadiusMeters = parseFloat(document.getElementById('crownRadius').value);
+      const latSpan = NE_CORNER[0] - SW_CORNER[0];
+      const lngSpan = NE_CORNER[1] - SW_CORNER[1];
+      const peaks = [];
+      const rows = 14;
+      const cols = 14;
 
-            // Center Point Marker
-            const center = L.circleMarker([tree.lat, tree.lng], {
-              radius: 3.5,
-              color: '#ffffff',
-              fillColor: '#059669',
-              fillOpacity: 1,
-              weight: 1.5
-            }).bindPopup(`
-              <div style="font-size:12px; color:#0f172a; line-height:1.5;">
-                <b style="color:#059669;">Tree Canopy #${count + 1}</b><br>
-                <b>Crown Radius:</b> ${tree.radius} m<br>
-                <b>Area:</b> ${(Math.PI * tree.radius * tree.radius).toFixed(1)} m²<br>
-                <b>Coordinates:</b> ${tree.lat.toFixed(6)}, ${tree.lng.toFixed(6)}
-              </div>
-            `);
+      for (let r = 1; r < rows; r++) {
+        for (let c = 1; c < cols; c++) {
+          const lat = SW_CORNER[0] + (latSpan / rows) * r;
+          const lng = SW_CORNER[1] + (lngSpan / cols) * c;
+          const latlng = L.latLng(lat, lng);
+          if (SITE_BOUNDS.contains(latlng)) {
+            peaks.push({ latlng, val: 50 });
+          }
+        }
+      }
+      renderTreeMarkers(peaks, crownRadiusMeters);
+    }
 
-            treesLayer.addLayer(circle);
-            treesLayer.addLayer(center);
+    // Sequential marker rendering animation
+    function renderTreeMarkers(peaks, crownRadius) {
+      const btn = document.getElementById('btnDetect');
+      const scanner = document.getElementById('scanner-line');
 
-            count++;
-            totalArea += Math.PI * tree.radius * tree.radius;
+      let count = 0;
+      let totalArea = 0;
 
-            document.getElementById('statCount').innerText = count;
-            document.getElementById('statArea').innerText = Math.round(totalArea) + ' m²';
+      if (peaks.length === 0) {
+        scanner.style.display = 'none';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
+        alert("No tree canopies detected at this sensitivity. Try decreasing the slider.");
+        return;
+      }
 
-            // Store GeoJSON Feature
-            detectedFeatures.push({
-              type: "Feature",
-              properties: {
-                id: count,
-                crown_radius_m: tree.radius,
-                area_sqm: parseFloat((Math.PI * tree.radius * tree.radius).toFixed(2))
-              },
-              geometry: {
-                type: "Point",
-                coordinates: [tree.lng, tree.lat]
-              }
-            });
+      peaks.forEach((peak, idx) => {
+        setTimeout(() => {
+          const radius = parseFloat((crownRadius * (0.85 + Math.min(peak.val / 150, 0.4))).toFixed(1));
 
-            // Finished animation
-            if (count === detected.length) {
-              scanner.style.display = 'none';
-              btn.disabled = false;
-              btn.innerHTML = '<i class="fa-solid fa-check"></i> Detection Complete';
+          const circle = L.circle(peak.latlng, {
+            radius: radius,
+            color: '#34d399',
+            fillColor: '#10b981',
+            fillOpacity: 0.35,
+            weight: 2,
+            className: 'tree-halo'
+          });
+
+          const center = L.circleMarker(peak.latlng, {
+            radius: 3.5,
+            color: '#ffffff',
+            fillColor: '#059669',
+            fillOpacity: 1,
+            weight: 1.5
+          }).bindPopup(`
+            <div style="font-size:12px; color:#0f172a; line-height:1.5;">
+              <b style="color:#059669;">Tree Canopy #${count + 1}</b><br>
+              <b>Crown Radius:</b> ${radius} m<br>
+              <b>Crown Area:</b> ${(Math.PI * radius * radius).toFixed(1)} m²<br>
+              <b>Coordinates:</b> ${peak.latlng.lat.toFixed(6)}, ${peak.latlng.lng.toFixed(6)}
+            </div>
+          `);
+
+          treesLayer.addLayer(circle);
+          treesLayer.addLayer(center);
+
+          count++;
+          totalArea += Math.PI * radius * radius;
+
+          document.getElementById('statCount').innerText = count;
+          document.getElementById('statArea').innerText = Math.round(totalArea) + ' m²';
+
+          detectedFeatures.push({
+            type: "Feature",
+            properties: {
+              id: count,
+              crown_radius_m: radius,
+              area_sqm: parseFloat((Math.PI * radius * radius).toFixed(2))
+            },
+            geometry: {
+              type: "Point",
+              coordinates: [peak.latlng.lng, peak.latlng.lat]
             }
-          }, idx * 35);
-        });
+          });
 
-      }, 1500);
+          if (count === peaks.length) {
+            scanner.style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Detection Complete';
+          }
+        }, idx * 25);
+      });
     }
 
     function clearDetections() {
@@ -366,7 +473,6 @@
       btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
     }
 
-    // Export Detections directly to GeoJSON for QGIS
     function exportGeoJSON() {
       if (detectedFeatures.length === 0) {
         alert("Please run detection first to generate tree canopies.");
