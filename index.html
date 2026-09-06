@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Tea Garden AI Canopy Detection | Rituraj Gogoi</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
@@ -19,7 +19,7 @@
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
+    html, body { width: 100%; height: 100%; height: 100dvh; background: var(--bg); color: var(--text); overflow: hidden; }
 
     /* Spatial Canvas Map */
     #map {
@@ -34,39 +34,44 @@
 
     /* Top Left HUD */
     .hud-title {
-      position: absolute; top: 16px; left: 16px; z-index: 1000;
+      position: absolute; top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); z-index: 1000;
       background: var(--card-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
       border: 1px solid var(--border); border-radius: 12px; padding: 12px 18px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      max-width: calc(100vw - 32px);
     }
     .hud-title h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
     .hud-title h1 i { color: var(--neon); }
     .hud-title span { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
 
-    /* Top Right AI Detection Suite */
+    /* AI Detection Suite */
     .ai-suite {
-      position: absolute; top: 16px; right: 16px; z-index: 1000;
-      width: 290px; background: var(--card-bg); backdrop-filter: blur(16px);
+      position: absolute; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 1000;
+      width: 290px; background: var(--card-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--border); border-radius: 14px; padding: 16px;
       box-shadow: 0 15px 40px rgba(0,0,0,0.7);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .suite-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .suite-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; cursor: pointer; }
     .suite-header h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--neon); font-weight: 700; }
+    .suite-header-actions { display: flex; align-items: center; gap: 8px; }
+    .toggle-icon { display: none; color: var(--muted); font-size: 12px; }
     .pulse-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--neon); box-shadow: 0 0 10px var(--neon); animation: pulse 1.8s infinite; }
 
     .ai-btn-detect {
       width: 100%; background: linear-gradient(135deg, #059669, #10b981);
-      color: #fff; border: none; padding: 11px; font-size: 12px; font-weight: 700;
+      color: #fff; border: none; padding: 12px; font-size: 12px; font-weight: 700;
       letter-spacing: 0.5px; border-radius: 8px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 8px;
       box-shadow: 0 0 18px rgba(16, 185, 129, 0.4); transition: transform 0.2s, background 0.2s;
+      touch-action: manipulation;
     }
     .ai-btn-detect:hover { transform: translateY(-1px); background: linear-gradient(135deg, #10b981, #34d399); }
     .ai-btn-detect:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
 
     .control-group { margin-top: 14px; }
     .control-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
-    .control-group input[type=range] { width: 100%; accent-color: var(--neon); cursor: pointer; }
+    .control-group input[type=range] { width: 100%; height: 20px; accent-color: var(--neon); cursor: pointer; }
 
     .stats-grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px;
@@ -81,15 +86,16 @@
     .action-row { display: flex; gap: 8px; margin-top: 14px; }
     .action-btn {
       flex: 1; background: #1e293b; color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 8px; font-size: 11px; font-weight: 600; border-radius: 6px; cursor: pointer;
+      padding: 10px; font-size: 11px; font-weight: 600; border-radius: 6px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 5px; transition: background 0.2s;
+      touch-action: manipulation;
     }
     .action-btn:hover { background: #334155; color: #fff; }
 
-    /* Bottom Left Coordinates & Opacity */
+    /* Bottom HUD */
     .hud-bottom {
-      position: absolute; bottom: 20px; left: 16px; z-index: 1000;
-      background: var(--card-bg); backdrop-filter: blur(12px);
+      position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); left: max(16px, env(safe-area-inset-left)); z-index: 1000;
+      background: var(--card-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px;
       font-size: 11px; display: flex; align-items: center; gap: 16px;
     }
@@ -109,7 +115,6 @@
       100% { top: 100%; opacity: 0.3; }
     }
 
-    /* Pulsing Tree Ring Styling */
     .tree-halo {
       border: 2px solid #34d399;
       border-radius: 50%;
@@ -127,6 +132,56 @@
       0%, 100% { transform: scale(0.9); opacity: 0.5; }
       50% { transform: scale(1.2); opacity: 1; }
     }
+
+    /* ------------------------------------------------------------- */
+    /* RESPONSIVE BREAKPOINTS (Mobile & Tablet Adjustments)           */
+    /* ------------------------------------------------------------- */
+    @media (max-width: 768px) {
+      .hud-title {
+        right: max(16px, env(safe-area-inset-right));
+        padding: 8px 12px;
+      }
+      .hud-title h1 { font-size: 13px; }
+      .hud-title span { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+      /* Transform suite into a collapsible bottom card */
+      .ai-suite {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        border-radius: 16px 16px 0 0;
+        padding: 16px 16px max(16px, env(safe-area-inset-bottom));
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+      .toggle-icon { display: block; }
+      
+      .ai-suite.collapsed .suite-body {
+        display: none;
+      }
+      .ai-suite.collapsed {
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+      }
+
+      /* Stack and re-position bottom coordinate display */
+      .hud-bottom {
+        bottom: auto;
+        top: calc(max(16px, env(safe-area-inset-top)) + 58px);
+        left: max(16px, env(safe-area-inset-left));
+        right: max(16px, env(safe-area-inset-right));
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 6px 10px;
+        font-size: 10px;
+      }
+      .hud-bottom div:last-child {
+        width: 100%;
+        justify-content: space-between;
+      }
+    }
   </style>
 </head>
 <body>
@@ -134,363 +189,5 @@
   <div id="map"></div>
   <div id="scanner-line"></div>
 
-  <!-- HUD Title -->
   <div class="hud-title">
-    <h1><i class="fa-solid fa-tree"></i> Tea Garden Canopy AI</h1>
-    <span>EPSG:3857 · High-Res Orthomosaic · Spectral Computer Vision</span>
-  </div>
-
-  <!-- Top Right AI Control Suite -->
-  <div class="ai-suite">
-    <div class="suite-header">
-      <h3>Spectral Vision Engine</h3>
-      <div class="pulse-indicator"></div>
-    </div>
-
-    <button class="ai-btn-detect" id="btnDetect" onclick="runVisionModel()">
-      <i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection
-    </button>
-
-    <div class="control-group">
-      <div class="control-label">
-        <span>Canopy Sensitivity</span>
-        <span id="thresh-val">0.35</span>
-      </div>
-      <input type="range" id="sensitivity" min="0.15" max="0.65" step="0.02" value="0.35" oninput="document.getElementById('thresh-val').innerText = this.value" />
-    </div>
-
-    <div class="control-group">
-      <div class="control-label">
-        <span>Crown Radius (Scale)</span>
-        <span id="radius-val">2.8 m</span>
-      </div>
-      <input type="range" id="crownRadius" min="1.5" max="5.0" step="0.2" value="2.8" oninput="document.getElementById('radius-val').innerText = this.value + ' m'" />
-    </div>
-
-    <div class="stats-grid">
-      <div class="stat-card">
-        <span>Trees Detected</span>
-        <strong id="statCount">0</strong>
-      </div>
-      <div class="stat-card">
-        <span>Canopy Area</span>
-        <strong id="statArea">0 m²</strong>
-      </div>
-    </div>
-
-    <div class="action-row">
-      <button class="action-btn" onclick="exportGeoJSON()"><i class="fa-solid fa-download"></i> GeoJSON</button>
-      <button class="action-btn" onclick="clearDetections()"><i class="fa-solid fa-trash"></i> Clear</button>
-    </div>
-  </div>
-
-  <!-- Bottom Coordinates / Opacity -->
-  <div class="hud-bottom">
-    <div id="coords-text">Lat: 27.06029 | Lng: 94.86607 | Zoom: 18</div>
-    <div style="display:flex; align-items:center; gap:8px;">
-      <span>Opacity:</span>
-      <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="1" style="accent-color: var(--neon); width: 80px;" oninput="orthoLayer.setOpacity(this.value)">
-    </div>
-  </div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    // Exact Bounding Box from TileMap XML
-    const SW_CORNER = [27.05936781688538, 94.86518823860000];
-    const NE_CORNER = [27.06121598240000, 94.86694912656071];
-    const SITE_BOUNDS = L.latLngBounds(SW_CORNER, NE_CORNER);
-    const SITE_CENTER = [
-      (SW_CORNER[0] + NE_CORNER[0]) / 2,
-      (SW_CORNER[1] + NE_CORNER[1]) / 2
-    ];
-
-    // Leaflet Map (Dark GIS environment, no OSM)
-    const map = L.map('map', {
-      center: SITE_CENTER,
-      zoom: 18,
-      minZoom: 16,
-      maxZoom: 22,
-      maxBounds: SITE_BOUNDS.pad(0.15),
-      maxBoundsViscosity: 1.0,
-      zoomControl: false,
-      attributionControl: false
-    });
-
-    // TMS Tile Layer for your "tea" directory
-    const orthoLayer = L.tileLayer('./tea/{z}/{x}/{y}.png', {
-      minZoom: 14,
-      maxNativeZoom: 19,
-      maxZoom: 22,
-      tms: true,
-      bounds: SITE_BOUNDS
-    }).addTo(map);
-
-    const treesLayer = L.layerGroup().addTo(map);
-    let detectedFeatures = [];
-
-    // Track Coordinates on Mouse Move
-    map.on('mousemove', (e) => {
-      document.getElementById('coords-text').innerText = 
-        `Lat: ${e.latlng.lat.toFixed(5)} | Lng: ${e.latlng.lng.toFixed(5)} | Zoom: ${map.getZoom()}`;
-    });
-
-    // -------------------------------------------------------------
-    // CLIENT-SIDE COMPUTER VISION & CANOPY DETECTION
-    // -------------------------------------------------------------
-    function runVisionModel() {
-      const btn = document.getElementById('btnDetect');
-      const scanner = document.getElementById('scanner-line');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reading Ortho Pixels...';
-
-      scanner.style.display = 'block';
-      scanner.style.animation = 'scanSweep 2s linear infinite';
-      clearDetections();
-
-      // Retrieve all active Leaflet tile elements
-      const tileImages = Array.from(document.querySelectorAll('.leaflet-tile-pane img'))
-        .filter(img => img.complete && img.naturalWidth > 0);
-
-      if (tileImages.length === 0) {
-        alert("Tiles are still loading. Please wait a few seconds and try again.");
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
-        scanner.style.display = 'none';
-        return;
-      }
-
-      // Offscreen analysis canvas matching current map viewport
-      const mapSize = map.getSize();
-      const cvCanvas = document.createElement('canvas');
-      cvCanvas.width = mapSize.x;
-      cvCanvas.height = mapSize.y;
-      const ctx = cvCanvas.getContext('2d', { willReadFrequently: true });
-
-      // Draw all visible tiles directly to offscreen canvas
-      const mapRect = map.getContainer().getBoundingClientRect();
-      tileImages.forEach(img => {
-        const rect = img.getBoundingClientRect();
-        const x = rect.left - mapRect.left;
-        const y = rect.top - mapRect.top;
-        try {
-          ctx.drawImage(img, x, y, rect.width, rect.height);
-        } catch (e) {}
-      });
-
-      setTimeout(() => {
-        let imgData;
-        try {
-          imgData = ctx.getImageData(0, 0, cvCanvas.width, cvCanvas.height);
-        } catch (err) {
-          console.warn("Pixel inspection restricted. Falling back to geometric bounds scan.");
-          runFallbackScan();
-          return;
-        }
-
-        const pixels = imgData.data;
-        const w = cvCanvas.width;
-        const h = cvCanvas.height;
-
-        const userSensitivity = parseFloat(document.getElementById('sensitivity').value);
-        const crownRadiusMeters = parseFloat(document.getElementById('crownRadius').value);
-
-        // Convert world radius to screen pixels
-        const centerLatLng = map.getCenter();
-        const p1 = map.latLngToContainerPoint(centerLatLng);
-        const p2 = map.latLngToContainerPoint([centerLatLng.lat, centerLatLng.lng + 0.0001]);
-        const metersPerPixel = (0.0001 * 111320 * Math.cos(centerLatLng.lat * Math.PI / 180)) / Math.abs(p2.x - p1.x);
-        const minPixelDistance = Math.max(14, Math.round(crownRadiusMeters / metersPerPixel));
-
-        const exgGrid = new Float32Array(w * h);
-
-        // Pixel-by-pixel ExG computation & black collar filtering
-        for (let y = 0; y < h; y += 2) {
-          for (let x = 0; x < w; x += 2) {
-            const idx = (y * w + x) * 4;
-            const r = pixels[idx];
-            const g = pixels[idx + 1];
-            const b = pixels[idx + 2];
-            const a = pixels[idx + 3];
-
-            // Strict background boundary: Reject black nodata collar & transparent edge pixels
-            if (a < 50 || (r <= 22 && g <= 22 && b <= 22)) {
-              exgGrid[y * w + x] = -999;
-              continue;
-            }
-
-            // ExG (Excess Green): 2*G - R - B
-            const exg = (2 * g - r - b);
-            const brightness = (r + g + b) / 3;
-
-            // Shade trees are brighter and display higher ExG than surrounding tea rows
-            if (exg > (userSensitivity * 65) && brightness > 40 && g > r) {
-              exgGrid[y * w + x] = exg;
-            } else {
-              exgGrid[y * w + x] = -999;
-            }
-          }
-        }
-
-        // Local peak detection with Non-Maximum Suppression (NMS)
-        const detectedPeaks = [];
-        const step = 4;
-
-        for (let y = minPixelDistance; y < h - minPixelDistance; y += step) {
-          for (let x = minPixelDistance; x < w - minPixelDistance; x += step) {
-            const val = exgGrid[y * w + x];
-            if (val <= 0) continue;
-
-            let isLocalMax = true;
-            for (let dy = -minPixelDistance; dy <= minPixelDistance; dy += step) {
-              for (let dx = -minPixelDistance; dx <= minPixelDistance; dx += step) {
-                if (dx === 0 && dy === 0) continue;
-                if (exgGrid[(y + dy) * w + (x + dx)] >= val) {
-                  isLocalMax = false;
-                  break;
-                }
-              }
-              if (!isLocalMax) break;
-            }
-
-            if (isLocalMax) {
-              const latlng = map.containerPointToLatLng([x, y]);
-              // Verify coordinate strictly inside orthomosaic bounds
-              if (SITE_BOUNDS.contains(latlng)) {
-                detectedPeaks.push({ latlng, val });
-              }
-            }
-          }
-        }
-
-        renderTreeMarkers(detectedPeaks, crownRadiusMeters);
-      }, 400);
-    }
-
-    // Fallback scan if cross-origin canvas security blocks direct pixel extraction
-    function runFallbackScan() {
-      const crownRadiusMeters = parseFloat(document.getElementById('crownRadius').value);
-      const latSpan = NE_CORNER[0] - SW_CORNER[0];
-      const lngSpan = NE_CORNER[1] - SW_CORNER[1];
-      const peaks = [];
-      const rows = 14;
-      const cols = 14;
-
-      for (let r = 1; r < rows; r++) {
-        for (let c = 1; c < cols; c++) {
-          const lat = SW_CORNER[0] + (latSpan / rows) * r;
-          const lng = SW_CORNER[1] + (lngSpan / cols) * c;
-          const latlng = L.latLng(lat, lng);
-          if (SITE_BOUNDS.contains(latlng)) {
-            peaks.push({ latlng, val: 50 });
-          }
-        }
-      }
-      renderTreeMarkers(peaks, crownRadiusMeters);
-    }
-
-    // Sequential marker rendering animation
-    function renderTreeMarkers(peaks, crownRadius) {
-      const btn = document.getElementById('btnDetect');
-      const scanner = document.getElementById('scanner-line');
-
-      let count = 0;
-      let totalArea = 0;
-
-      if (peaks.length === 0) {
-        scanner.style.display = 'none';
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
-        alert("No tree canopies detected at this sensitivity. Try decreasing the slider.");
-        return;
-      }
-
-      peaks.forEach((peak, idx) => {
-        setTimeout(() => {
-          const radius = parseFloat((crownRadius * (0.85 + Math.min(peak.val / 150, 0.4))).toFixed(1));
-
-          const circle = L.circle(peak.latlng, {
-            radius: radius,
-            color: '#34d399',
-            fillColor: '#10b981',
-            fillOpacity: 0.35,
-            weight: 2,
-            className: 'tree-halo'
-          });
-
-          const center = L.circleMarker(peak.latlng, {
-            radius: 3.5,
-            color: '#ffffff',
-            fillColor: '#059669',
-            fillOpacity: 1,
-            weight: 1.5
-          }).bindPopup(`
-            <div style="font-size:12px; color:#0f172a; line-height:1.5;">
-              <b style="color:#059669;">Tree Canopy #${count + 1}</b><br>
-              <b>Crown Radius:</b> ${radius} m<br>
-              <b>Crown Area:</b> ${(Math.PI * radius * radius).toFixed(1)} m²<br>
-              <b>Coordinates:</b> ${peak.latlng.lat.toFixed(6)}, ${peak.latlng.lng.toFixed(6)}
-            </div>
-          `);
-
-          treesLayer.addLayer(circle);
-          treesLayer.addLayer(center);
-
-          count++;
-          totalArea += Math.PI * radius * radius;
-
-          document.getElementById('statCount').innerText = count;
-          document.getElementById('statArea').innerText = Math.round(totalArea) + ' m²';
-
-          detectedFeatures.push({
-            type: "Feature",
-            properties: {
-              id: count,
-              crown_radius_m: radius,
-              area_sqm: parseFloat((Math.PI * radius * radius).toFixed(2))
-            },
-            geometry: {
-              type: "Point",
-              coordinates: [peak.latlng.lng, peak.latlng.lat]
-            }
-          });
-
-          if (count === peaks.length) {
-            scanner.style.display = 'none';
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-check"></i> Detection Complete';
-          }
-        }, idx * 25);
-      });
-    }
-
-    function clearDetections() {
-      treesLayer.clearLayers();
-      detectedFeatures = [];
-      document.getElementById('statCount').innerText = '0';
-      document.getElementById('statArea').innerText = '0 m²';
-      const btn = document.getElementById('btnDetect');
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
-    }
-
-    function exportGeoJSON() {
-      if (detectedFeatures.length === 0) {
-        alert("Please run detection first to generate tree canopies.");
-        return;
-      }
-      const geojson = {
-        type: "FeatureCollection",
-        crs: { type: "name", properties: { name: "urn:ogc:def:crs:OGC:1.3:CRS84" } },
-        features: detectedFeatures
-      };
-      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `tea_garden_canopies_${detectedFeatures.length}_trees.geojson`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  </script>
-</body>
-</html>
+    <h1><i class="fa
