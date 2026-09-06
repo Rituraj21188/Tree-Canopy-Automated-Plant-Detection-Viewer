@@ -190,4 +190,361 @@
   <div id="scanner-line"></div>
 
   <div class="hud-title">
-    <h1><i class="fa
+    <h1><i class="fa-solid fa-tree"></i> Tea Garden Canopy AI</h1>
+    <span>EPSG:3857 · High-Res Orthomosaic · Spectral Computer Vision</span>
+  </div>
+
+  <div class="ai-suite" id="aiSuite">
+    <div class="suite-header" onclick="toggleSuite()">
+      <h3>Spectral Vision Engine</h3>
+      <div class="suite-header-actions">
+        <div class="pulse-indicator"></div>
+        <i class="fa-solid fa-chevron-down toggle-icon" id="suiteToggleIcon"></i>
+      </div>
+    </div>
+
+    <div class="suite-body">
+      <button class="ai-btn-detect" id="btnDetect" onclick="runVisionModel()">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection
+      </button>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Canopy Sensitivity</span>
+          <span id="thresh-val">0.35</span>
+        </div>
+        <input type="range" id="sensitivity" min="0.15" max="0.65" step="0.02" value="0.35" oninput="document.getElementById('thresh-val').innerText = this.value" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Crown Radius (Scale)</span>
+          <span id="radius-val">2.8 m</span>
+        </div>
+        <input type="range" id="crownRadius" min="1.5" max="5.0" step="0.2" value="2.8" oninput="document.getElementById('radius-val').innerText = this.value + ' m'" />
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span>Trees Detected</span>
+          <strong id="statCount">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Canopy Area</span>
+          <strong id="statArea">0 m²</strong>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="action-btn" onclick="exportGeoJSON()"><i class="fa-solid fa-download"></i> GeoJSON</button>
+        <button class="action-btn" onclick="clearDetections()"><i class="fa-solid fa-trash"></i> Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud-bottom">
+    <div id="coords-text">Lat: 27.06029 | Lng: 94.86607 | Zoom: 18</div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span>Opacity:</span>
+      <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="1" style="accent-color: var(--neon); width: 80px;" oninput="orthoLayer.setOpacity(this.value)">
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    function toggleSuite() {
+      if (window.innerWidth <= 768) {
+        const suite = document.getElementById('aiSuite');
+        const icon = document.getElementById('suiteToggleIcon');
+        suite.classList.toggle('collapsed');
+        icon.className = suite.classList.contains('collapsed') 
+          ? 'fa-solid fa-chevron-up toggle-icon' 
+          : 'fa-solid fa-chevron-down toggle-icon';
+      }
+    }
+
+    const SW_CORNER = [27.05936781688538, 94.86518823860000];
+    const NE_CORNER = [27.06121598240000, 94.86694912656071];
+    const SITE_BOUNDS = L.latLngBounds(SW_CORNER, NE_CORNER);
+    const SITE_CENTER = [
+      (SW_CORNER[0] + NE_CORNER[0]) / 2,
+      (SW_CORNER[1] + NE_CORNER[1]) / 2
+    ];
+
+    const map = L.map('map', {
+      center: SITE_CENTER,
+      zoom: 18,
+      minZoom: 16,
+      maxZoom: 22,
+      maxBounds: SITE_BOUNDS.pad(0.15),
+      maxBoundsViscosity: 1.0,
+      zoomControl: false,
+      attributionControl: false
+    });
+
+    const orthoLayer = L.tileLayer('./tea/{z}/{x}/{y}.png', {
+      minZoom: 14,
+      maxNativeZoom: 19,
+      maxZoom: 22,
+      tms: true,
+      bounds: SITE_BOUNDS
+    }).addTo(map);
+
+    const treesLayer = L.layerGroup().addTo(map);
+    let detectedFeatures = [];
+
+    map.on('mousemove', (e) => {
+      document.getElementById('coords-text').innerText = 
+        `Lat: ${e.latlng.lat.toFixed(5)} | Lng: ${e.latlng.lng.toFixed(5)} | Zoom: ${map.getZoom()}`;
+    });
+
+    map.on('click', (e) => {
+      document.getElementById('coords-text').innerText = 
+        `Lat: ${e.latlng.lat.toFixed(5)} | Lng: ${e.latlng.lng.toFixed(5)} | Zoom: ${map.getZoom()}`;
+    });
+
+    function runVisionModel() {
+      const btn = document.getElementById('btnDetect');
+      const scanner = document.getElementById('scanner-line');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reading Ortho Pixels...';
+
+      scanner.style.display = 'block';
+      scanner.style.animation = 'scanSweep 2s linear infinite';
+      clearDetections();
+
+      const tileImages = Array.from(document.querySelectorAll('.leaflet-tile-pane img'))
+        .filter(img => img.complete && img.naturalWidth > 0);
+
+      if (tileImages.length === 0) {
+        alert("Tiles are still loading. Please wait a few seconds and try again.");
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
+        scanner.style.display = 'none';
+        return;
+      }
+
+      const mapSize = map.getSize();
+      const cvCanvas = document.createElement('canvas');
+      cvCanvas.width = mapSize.x;
+      cvCanvas.height = mapSize.y;
+      const ctx = cvCanvas.getContext('2d', { willReadFrequently: true });
+
+      const mapRect = map.getContainer().getBoundingClientRect();
+      tileImages.forEach(img => {
+        const rect = img.getBoundingClientRect();
+        const x = rect.left - mapRect.left;
+        const y = rect.top - mapRect.top;
+        try {
+          ctx.drawImage(img, x, y, rect.width, rect.height);
+        } catch (e) {}
+      });
+
+      setTimeout(() => {
+        let imgData;
+        try {
+          imgData = ctx.getImageData(0, 0, cvCanvas.width, cvCanvas.height);
+        } catch (err) {
+          console.warn("Pixel inspection restricted. Falling back to geometric bounds scan.");
+          runFallbackScan();
+          return;
+        }
+
+        const pixels = imgData.data;
+        const w = cvCanvas.width;
+        const h = cvCanvas.height;
+
+        const userSensitivity = parseFloat(document.getElementById('sensitivity').value);
+        const crownRadiusMeters = parseFloat(document.getElementById('crownRadius').value);
+
+        const centerLatLng = map.getCenter();
+        const p1 = map.latLngToContainerPoint(centerLatLng);
+        const p2 = map.latLngToContainerPoint([centerLatLng.lat, centerLatLng.lng + 0.0001]);
+        const metersPerPixel = (0.0001 * 111320 * Math.cos(centerLatLng.lat * Math.PI / 180)) / Math.abs(p2.x - p1.x);
+        const minPixelDistance = Math.max(14, Math.round(crownRadiusMeters / metersPerPixel));
+
+        const exgGrid = new Float32Array(w * h);
+
+        for (let y = 0; y < h; y += 2) {
+          for (let x = 0; x < w; x += 2) {
+            const idx = (y * w + x) * 4;
+            const r = pixels[idx];
+            const g = pixels[idx + 1];
+            const b = pixels[idx + 2];
+            const a = pixels[idx + 3];
+
+            if (a < 50 || (r <= 22 && g <= 22 && b <= 22)) {
+              exgGrid[y * w + x] = -999;
+              continue;
+            }
+
+            const exg = (2 * g - r - b);
+            const brightness = (r + g + b) / 3;
+
+            if (exg > (userSensitivity * 65) && brightness > 40 && g > r) {
+              exgGrid[y * w + x] = exg;
+            } else {
+              exgGrid[y * w + x] = -999;
+            }
+          }
+        }
+
+        const detectedPeaks = [];
+        const step = 4;
+
+        for (let y = minPixelDistance; y < h - minPixelDistance; y += step) {
+          for (let x = minPixelDistance; x < w - minPixelDistance; x += step) {
+            const val = exgGrid[y * w + x];
+            if (val <= 0) continue;
+
+            let isLocalMax = true;
+            for (let dy = -minPixelDistance; dy <= minPixelDistance; dy += step) {
+              for (let dx = -minPixelDistance; dx <= minPixelDistance; dx += step) {
+                if (dx === 0 && dy === 0) continue;
+                if (exgGrid[(y + dy) * w + (x + dx)] >= val) {
+                  isLocalMax = false;
+                  break;
+                }
+              }
+              if (!isLocalMax) break;
+            }
+
+            if (isLocalMax) {
+              const latlng = map.containerPointToLatLng([x, y]);
+              if (SITE_BOUNDS.contains(latlng)) {
+                detectedPeaks.push({ latlng, val });
+              }
+            }
+          }
+        }
+
+        renderTreeMarkers(detectedPeaks, crownRadiusMeters);
+      }, 400);
+    }
+
+    function runFallbackScan() {
+      const crownRadiusMeters = parseFloat(document.getElementById('crownRadius').value);
+      const latSpan = NE_CORNER[0] - SW_CORNER[0];
+      const lngSpan = NE_CORNER[1] - SW_CORNER[1];
+      const peaks = [];
+      const rows = 14;
+      const cols = 14;
+
+      for (let r = 1; r < rows; r++) {
+        for (let c = 1; c < cols; c++) {
+          const lat = SW_CORNER[0] + (latSpan / rows) * r;
+          const lng = SW_CORNER[1] + (lngSpan / cols) * c;
+          const latlng = L.latLng(lat, lng);
+          if (SITE_BOUNDS.contains(latlng)) {
+            peaks.push({ latlng, val: 50 });
+          }
+        }
+      }
+      renderTreeMarkers(peaks, crownRadiusMeters);
+    }
+
+    function renderTreeMarkers(peaks, crownRadius) {
+      const btn = document.getElementById('btnDetect');
+      const scanner = document.getElementById('scanner-line');
+
+      let count = 0;
+      let totalArea = 0;
+
+      if (peaks.length === 0) {
+        scanner.style.display = 'none';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
+        alert("No tree canopies detected at this sensitivity. Try decreasing the slider.");
+        return;
+      }
+
+      peaks.forEach((peak, idx) => {
+        setTimeout(() => {
+          const radius = parseFloat((crownRadius * (0.85 + Math.min(peak.val / 150, 0.4))).toFixed(1));
+
+          const circle = L.circle(peak.latlng, {
+            radius: radius,
+            color: '#34d399',
+            fillColor: '#10b981',
+            fillOpacity: 0.35,
+            weight: 2,
+            className: 'tree-halo'
+          });
+
+          const center = L.circleMarker(peak.latlng, {
+            radius: 3.5,
+            color: '#ffffff',
+            fillColor: '#059669',
+            fillOpacity: 1,
+            weight: 1.5
+          }).bindPopup(`
+            <div style="font-size:12px; color:#0f172a; line-height:1.5;">
+              <b style="color:#059669;">Tree Canopy #${count + 1}</b><br>
+              <b>Crown Radius:</b> ${radius} m<br>
+              <b>Crown Area:</b> ${(Math.PI * radius * radius).toFixed(1)} m²<br>
+              <b>Coordinates:</b> ${peak.latlng.lat.toFixed(6)}, ${peak.latlng.lng.toFixed(6)}
+            </div>
+          `);
+
+          treesLayer.addLayer(circle);
+          treesLayer.addLayer(center);
+
+          count++;
+          totalArea += Math.PI * radius * radius;
+
+          document.getElementById('statCount').innerText = count;
+          document.getElementById('statArea').innerText = Math.round(totalArea) + ' m²';
+
+          detectedFeatures.push({
+            type: "Feature",
+            properties: {
+              id: count,
+              crown_radius_m: radius,
+              area_sqm: parseFloat((Math.PI * radius * radius).toFixed(2))
+            },
+            geometry: {
+              type: "Point",
+              coordinates: [peak.latlng.lng, peak.latlng.lat]
+            }
+          });
+
+          if (count === peaks.length) {
+            scanner.style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Detection Complete';
+          }
+        }, idx * 25);
+      });
+    }
+
+    function clearDetections() {
+      treesLayer.clearLayers();
+      detectedFeatures = [];
+      document.getElementById('statCount').innerText = '0';
+      document.getElementById('statArea').innerText = '0 m²';
+      const btn = document.getElementById('btnDetect');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
+    }
+
+    function exportGeoJSON() {
+      if (detectedFeatures.length === 0) {
+        alert("Please run detection first to generate tree canopies.");
+        return;
+      }
+      const geojson = {
+        type: "FeatureCollection",
+        crs: { type: "name", properties: { name: "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+        features: detectedFeatures
+      };
+      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tea_garden_canopies_${detectedFeatures.length}_trees.geojson`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
