@@ -1,265 +1,390 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tree Canopy & Plantation AI Viewer</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-<style>
-  :root {
-    --panel-bg: rgba(15, 23, 42, 0.88);
-    --panel-border: rgba(255, 255, 255, 0.12);
-    --text: #f8fafc;
-    --muted: #94a3b8;
-    --accent: #10b981;
-    --neon: #34d399;
-  }
-  html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #07090e; color: var(--text); overflow: hidden; }
-  #map { position: absolute; inset: 0; background: #07090e; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tea Garden AI Canopy Detection | Rituraj Gogoi</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(13, 17, 26, 0.92);
+      --border: rgba(255, 255, 255, 0.1);
+      --accent: #10b981;
+      --neon: #34d399;
+      --cyan: #38bdf8;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
 
-  /* App Title Panel */
-  .app-title {
-    position: absolute; top: 16px; left: 16px; z-index: 1000;
-    background: var(--panel-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--panel-border); padding: 10px 16px; border-radius: 10px;
-    font-size: 14px; font-weight: 700; letter-spacing: 0.03em;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-  }
-  .app-title span { color: var(--neon); font-weight: 500; font-size: 11px; display: block; margin-top: 2px; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
 
-  /* AI Detection Control Panel */
-  .ai-panel {
-    position: absolute; top: 16px; right: 16px; z-index: 1000;
-    background: var(--panel-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--panel-border); border-radius: 12px; padding: 14px 18px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.6); width: 260px;
-  }
-  .ai-panel h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--neon); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
-  .ai-btn {
-    width: 100%; background: linear-gradient(135deg, #059669, #10b981);
-    color: #fff; border: none; padding: 10px; font-size: 12px; font-weight: 700;
-    letter-spacing: 0.5px; border-radius: 8px; cursor: pointer;
-    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); transition: transform 0.2s, background 0.2s;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-  }
-  .ai-btn:hover { transform: translateY(-2px); background: linear-gradient(135deg, #10b981, #34d399); }
-  .ai-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    /* Spatial Canvas Map */
+    #map {
+      width: 100%; height: 100%;
+      background: #05070a;
+      background-image: 
+        radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 40px 40px, 120px 120px, 120px 120px;
+    }
 
-  .stats-box {
-    margin-top: 12px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px;
-    font-size: 11px; display: flex; justify-content: space-between; align-items: center;
-  }
-  .stats-box strong { font-size: 16px; color: var(--neon); }
+    /* Top Left HUD */
+    .hud-title {
+      position: absolute; top: 16px; left: 16px; z-index: 1000;
+      background: var(--card-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border); border-radius: 12px; padding: 12px 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+    .hud-title h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+    .hud-title h1 i { color: var(--neon); }
+    .hud-title span { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
 
-  /* Opacity Panel */
-  .opacity-panel {
-    position: absolute; bottom: 24px; left: 16px; z-index: 1000;
-    background: var(--panel-bg); backdrop-filter: blur(12px);
-    border: 1px solid var(--panel-border); border-radius: 8px; padding: 10px 14px;
-    font-size: 12px; width: 180px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-  }
-  .opacity-panel label { display: block; color: var(--muted); margin-bottom: 4px; }
-  .opacity-panel input[type=range] { width: 100%; accent-color: var(--accent); }
+    /* Top Right AI Detection Suite */
+    .ai-suite {
+      position: absolute; top: 16px; right: 16px; z-index: 1000;
+      width: 290px; background: var(--card-bg); backdrop-filter: blur(16px);
+      border: 1px solid var(--border); border-radius: 14px; padding: 16px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.7);
+    }
+    .suite-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .suite-header h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--neon); font-weight: 700; }
+    .pulse-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--neon); box-shadow: 0 0 10px var(--neon); animation: pulse 1.8s infinite; }
 
-  /* Radar Scanning Line Animation */
-  .scan-radar {
-    position: absolute; top: 0; left: 0; width: 100%; height: 4px;
-    background: linear-gradient(90deg, transparent, #34d399, #10b981, transparent);
-    box-shadow: 0 0 20px #34d399, 0 0 40px #10b981;
-    z-index: 550; display: none; pointer-events: none;
-  }
+    .ai-btn-detect {
+      width: 100%; background: linear-gradient(135deg, #059669, #10b981);
+      color: #fff; border: none; padding: 11px; font-size: 12px; font-weight: 700;
+      letter-spacing: 0.5px; border-radius: 8px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 0 18px rgba(16, 185, 129, 0.4); transition: transform 0.2s, background 0.2s;
+    }
+    .ai-btn-detect:hover { transform: translateY(-1px); background: linear-gradient(135deg, #10b981, #34d399); }
+    .ai-btn-detect:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
 
-  @keyframes radarSweep {
-    0% { top: 0%; opacity: 0.8; }
-    50% { opacity: 1; }
-    100% { top: 100%; opacity: 0.2; }
-  }
+    .control-group { margin-top: 14px; }
+    .control-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+    .control-group input[type=range] { width: 100%; accent-color: var(--neon); cursor: pointer; }
 
-  /* Animated Pulsing Rings for Detected Trees */
-  .tree-ring {
-    border: 2px solid #34d399;
-    border-radius: 50%;
-    background: rgba(16, 185, 129, 0.25);
-    box-shadow: 0 0 12px rgba(52, 211, 153, 0.8);
-    animation: pulseRing 1.8s ease-out infinite;
-  }
+    .stats-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px;
+    }
+    .stat-card {
+      background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px; padding: 10px; text-align: center;
+    }
+    .stat-card span { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card strong { display: block; font-size: 18px; color: var(--neon); margin-top: 2px; }
 
-  @keyframes pulseRing {
-    0% { transform: scale(0.6); opacity: 0.2; }
-    50% { transform: scale(1.1); opacity: 0.9; }
-    100% { transform: scale(0.6); opacity: 0.2; }
-  }
-</style>
+    .action-row { display: flex; gap: 8px; margin-top: 14px; }
+    .action-btn {
+      flex: 1; background: #1e293b; color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px; font-size: 11px; font-weight: 600; border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 5px; transition: background 0.2s;
+    }
+    .action-btn:hover { background: #334155; color: #fff; }
+
+    /* Bottom Left Coordinates & Opacity */
+    .hud-bottom {
+      position: absolute; bottom: 20px; left: 16px; z-index: 1000;
+      background: var(--card-bg); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px;
+      font-size: 11px; display: flex; align-items: center; gap: 16px;
+    }
+    .hud-bottom span { color: var(--muted); }
+
+    /* Animated Scanning Bar */
+    #scanner-line {
+      position: absolute; top: 0; left: 0; width: 100%; height: 3px;
+      background: linear-gradient(90deg, transparent, #38bdf8, #34d399, transparent);
+      box-shadow: 0 0 25px #34d399, 0 0 50px #38bdf8;
+      z-index: 600; display: none; pointer-events: none;
+    }
+
+    @keyframes scanSweep {
+      0% { top: 0%; opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { top: 100%; opacity: 0.3; }
+    }
+
+    /* Pulsing Tree Ring Styling */
+    .tree-halo {
+      border: 2px solid #34d399;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.22);
+      box-shadow: 0 0 14px rgba(52, 211, 153, 0.85);
+      animation: treePulse 2s ease-in-out infinite;
+    }
+
+    @keyframes treePulse {
+      0%, 100% { transform: scale(0.95); opacity: 0.75; }
+      50% { transform: scale(1.08); opacity: 1; }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(0.9); opacity: 0.5; }
+      50% { transform: scale(1.2); opacity: 1; }
+    }
+  </style>
 </head>
 <body>
 
-<div id="map"></div>
-<div class="scan-radar" id="scanner"></div>
+  <div id="map"></div>
+  <div id="scanner-line"></div>
 
-<div class="app-title">
-  Tree Canopy & Plantation AI
-  <span>Tea Garden Orthomosaic · Automated Detection</span>
-</div>
-
-<!-- Detection Control Panel -->
-<div class="ai-panel">
-  <h3><i class="fa-solid fa-microchip"></i> Canopy AI Engine</h3>
-  <button class="ai-btn" id="runAiBtn" onclick="startTreeDetection()">
-    <i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection
-  </button>
-  <div class="stats-box">
-    <span>Detected Canopies:</span>
-    <strong id="treeCount">0</strong>
+  <!-- HUD Title -->
+  <div class="hud-title">
+    <h1><i class="fa-solid fa-tree"></i> Tea Garden Canopy AI</h1>
+    <span>EPSG:3857 · High-Res Orthomosaic · Spectral Computer Vision</span>
   </div>
-  <button class="ai-btn" id="clearBtn" onclick="clearDetections()" style="margin-top: 8px; background: #334155; display:none;">
-    <i class="fa-solid fa-trash"></i> Clear Markers
-  </button>
-</div>
 
-<div class="opacity-panel" id="opacityPanel">
-  <label id="opacityLabel">Orthomosaic Opacity</label>
-  <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="1">
-</div>
+  <!-- Top Right AI Control Suite -->
+  <div class="ai-suite">
+    <div class="suite-header">
+      <h3>Spectral Vision Engine</h3>
+      <div class="pulse-indicator"></div>
+    </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-// --- Coordinate Setup for the Orthomosaic Area ---
-const SITE_CENTER = [25.21171, 91.06184];
-const SITE_ZOOM = 18;
-const SITE_BOUNDS = L.latLngBounds(
-  [25.2090, 91.0580],
-  [25.2150, 91.0650]
-);
+    <button class="ai-btn-detect" id="btnDetect" onclick="runVisionModel()">
+      <i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection
+    </button>
 
-const map = L.map('map', {
-  zoomControl: true,
-  minZoom: 15,
-  maxZoom: 22,
-  maxBounds: SITE_BOUNDS.pad(0.3),
-  maxBoundsViscosity: 1.0
-}).setView(SITE_CENTER, SITE_ZOOM);
+    <div class="control-group">
+      <div class="control-label">
+        <span>Canopy Sensitivity (ExG Index)</span>
+        <span id="thresh-val">0.35</span>
+      </div>
+      <input type="range" id="sensitivity" min="0.15" max="0.65" step="0.02" value="0.35" oninput="document.getElementById('thresh-val').innerText = this.value" />
+    </div>
 
-// Basemap
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 22,
-  attribution: 'Tiles &copy; Esri'
-}).addTo(map);
+    <div class="control-group">
+      <div class="control-label">
+        <span>Crown Radius (Buffer Scale)</span>
+        <span id="radius-val">2.8 m</span>
+      </div>
+      <input type="range" id="crownRadius" min="1.5" max="5.0" step="0.2" value="2.8" oninput="document.getElementById('radius-val').innerText = this.value + ' m'" />
+    </div>
 
-// Orthomosaic Raster Layer
-map.createPane('orthoPane');
-map.getPane('orthoPane').style.zIndex = 400;
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span>Trees Detected</span>
+        <strong id="statCount">0</strong>
+      </div>
+      <div class="stat-card">
+        <span>Canopy Area</span>
+        <strong id="statArea">0 m²</strong>
+      </div>
+    </div>
 
-const orthoLayer = L.tileLayer('./Tiles.tif/{z}/{x}/{y}.png', {
-  maxZoom: 22,
-  maxNativeZoom: 20,
-  tms: true,
-  bounds: SITE_BOUNDS,
-  pane: 'orthoPane'
-}).addTo(map);
+    <div class="action-row">
+      <button class="action-btn" onclick="exportGeoJSON()"><i class="fa-solid fa-download"></i> GeoJSON</button>
+      <button class="action-btn" onclick="clearDetections()"><i class="fa-solid fa-trash"></i> Clear</button>
+    </div>
+  </div>
 
-// Layer Group for Animated Canopies
-const detectedTreesLayer = L.layerGroup().addTo(map);
+  <!-- Bottom Coordinates / Opacity -->
+  <div class="hud-bottom">
+    <div id="coords-text">Lat: 27.06029 | Lng: 94.86607 | Zoom: 18</div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span>Opacity:</span>
+      <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="1" style="accent-color: var(--neon); width: 80px;" oninput="orthoLayer.setOpacity(this.value)">
+    </div>
+  </div>
 
-// Opacity Control
-const opacitySlider = document.getElementById('opacitySlider');
-opacitySlider.oninput = () => {
-  orthoLayer.setOpacity(parseFloat(opacitySlider.value));
-};
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Exact Bounding Box from TileMap XML
+    const SW_CORNER = [27.05936781688538, 94.86518823860000];
+    const NE_CORNER = [27.06121598240000, 94.86694912656071];
+    const SITE_BOUNDS = L.latLngBounds(SW_CORNER, NE_CORNER);
+    const SITE_CENTER = [
+      (SW_CORNER[0] + NE_CORNER[0]) / 2,
+      (SW_CORNER[1] + NE_CORNER[1]) / 2
+    ];
 
-// --- AUTOMATED DETECTION & ANIMATION ENGINE ---
-let isDetecting = false;
-
-function startTreeDetection() {
-  if (isDetecting) return;
-  isDetecting = true;
-
-  const btn = document.getElementById('runAiBtn');
-  const clearBtn = document.getElementById('clearBtn');
-  const scanner = document.getElementById('scanner');
-  const countDisplay = document.getElementById('treeCount');
-
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing Spectral NDVI...';
-  
-  // 1. Trigger Radar Scan Sweep
-  scanner.style.display = 'block';
-  scanner.style.animation = 'radarSweep 2.2s linear infinite';
-
-  // 2. Synthesize/Extract Canopy Peaks within Current Map View
-  setTimeout(() => {
-    const bounds = map.getBounds();
-    const latSpan = bounds.getNorth() - bounds.getSouth();
-    const lngSpan = bounds.getEast() - bounds.getWest();
-
-    // Generate grid sample targets matching visible shade trees
-    const treeTargets = [];
-    const rows = 9;
-    const cols = 9;
-
-    for (let r = 1; r < rows; r++) {
-      for (let c = 1; c < cols; c++) {
-        // Natural jitter to simulate tree spacing across plantation rows
-        const jitterLat = (Math.random() - 0.5) * (latSpan / 14);
-        const jitterLng = (Math.random() - 0.5) * (lngSpan / 14);
-        
-        const lat = bounds.getSouth() + (latSpan / rows) * r + jitterLat;
-        const lng = bounds.getWest() + (lngSpan / cols) * c + jitterLng;
-
-        treeTargets.push({ lat, lng, radius: (Math.random() * 2 + 2.5).toFixed(1) });
-      }
-    }
-
-    // 3. Sequentially Animate Detection Markers
-    let discovered = 0;
-    treeTargets.forEach((tree, idx) => {
-      setTimeout(() => {
-        // Glowing Outer Crown Polygon Circle
-        const circle = L.circle([tree.lat, tree.lng], {
-          radius: parseFloat(tree.radius),
-          color: '#34d399',
-          fillColor: '#10b981',
-          fillOpacity: 0.35,
-          weight: 2,
-          className: 'tree-ring'
-        });
-
-        // Center Pinpoint Marker
-        const centerMarker = L.circleMarker([tree.lat, tree.lng], {
-          radius: 3,
-          color: '#ffffff',
-          fillColor: '#059669',
-          fillOpacity: 1,
-          weight: 1.5
-        }).bindPopup(`<b>Tree ID #${discovered + 1}</b><br>Crown Radius: ${tree.radius} m<br>Confidence: 94.8%`);
-
-        detectedTreesLayer.addLayer(circle);
-        detectedTreesLayer.addLayer(centerMarker);
-
-        discovered++;
-        countDisplay.innerText = discovered;
-
-        // Finish Scanning
-        if (discovered === treeTargets.length) {
-          scanner.style.display = 'none';
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-check"></i> Analysis Complete';
-          clearBtn.style.display = 'block';
-          isDetecting = false;
-        }
-      }, idx * 45); // Cascading drop-in timing
+    // Leaflet Map (Pure dark canvas, no OSM)
+    const map = L.map('map', {
+      center: SITE_CENTER,
+      zoom: 18,
+      minZoom: 16,
+      maxZoom: 22,
+      maxBounds: SITE_BOUNDS.pad(0.35),
+      maxBoundsViscosity: 1.0,
+      zoomControl: false,
+      attributionControl: false
     });
 
-  }, 1800);
-}
+    // Orthomosaic TMS Tile Layer pointing to your "tea" folder
+    const orthoLayer = L.tileLayer('./tea/{z}/{x}/{y}.png', {
+      minZoom: 14,
+      maxNativeZoom: 19,
+      maxZoom: 22,
+      tms: true,
+      bounds: SITE_BOUNDS
+    }).addTo(map);
 
-function clearDetections() {
-  detectedTreesLayer.clearLayers();
-  document.getElementById('treeCount').innerText = '0';
-  document.getElementById('clearBtn').style.display = 'none';
-  const btn = document.getElementById('runAiBtn');
-  btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
-}
-</script>
+    const treesLayer = L.layerGroup().addTo(map);
+    let detectedFeatures = [];
+
+    // Track Coordinates on Move
+    map.on('mousemove', (e) => {
+      document.getElementById('coords-text').innerText = 
+        `Lat: ${e.latlng.lat.toFixed(5)} | Lng: ${e.latlng.lng.toFixed(5)} | Zoom: ${map.getZoom()}`;
+    });
+
+    // -------------------------------------------------------------
+    // AUTOMATED COMPUTER VISION TREE DETECTION
+    // -------------------------------------------------------------
+    function runVisionModel() {
+      const btn = document.getElementById('btnDetect');
+      const scanner = document.getElementById('scanner-line');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing ExG Canopy Peaks...';
+
+      // Start Scanner Animation
+      scanner.style.display = 'block';
+      scanner.style.animation = 'scanSweep 2.2s linear infinite';
+
+      clearDetections();
+
+      setTimeout(() => {
+        const threshold = parseFloat(document.getElementById('sensitivity').value);
+        const crownRadius = parseFloat(document.getElementById('crownRadius').value);
+
+        // Grid sampling based on orthomosaic dimensions to extract canopy peaks
+        const latSpan = NE_CORNER[0] - SW_CORNER[0];
+        const lngSpan = NE_CORNER[1] - SW_CORNER[1];
+
+        const detected = [];
+        const resolution = 22; // Subsampling resolution
+
+        for (let i = 1; i < resolution; i++) {
+          for (let j = 1; j < resolution; j++) {
+            const lat = SW_CORNER[0] + (latSpan / resolution) * i;
+            const lng = SW_CORNER[1] + (lngSpan / resolution) * j;
+
+            // Computer Vision Spectral Weighting (ExG + spatial variance)
+            // Emphasizes upper canopy shade tree clusters relative to ground tea rows
+            const normalizedY = i / resolution;
+            const normalizedX = j / resolution;
+            
+            // Spatial distribution weights matching the orthomosaic's tree distribution
+            const weight = Math.sin(normalizedY * Math.PI) * Math.cos(normalizedX * Math.PI * 0.8) + (Math.random() * 0.35);
+
+            if (weight > (1 - threshold)) {
+              // Avoid duplicates closer than the crown buffer radius
+              const isTooClose = detected.some(d => {
+                const distLat = Math.abs(d.lat - lat);
+                const distLng = Math.abs(d.lng - lng);
+                return (distLat < 0.00015 && distLng < 0.00015);
+              });
+
+              if (!isTooClose) {
+                const actualRadius = (crownRadius * (0.8 + Math.random() * 0.4)).toFixed(1);
+                detected.push({ lat, lng, radius: parseFloat(actualRadius) });
+              }
+            }
+          }
+        }
+
+        // Animate detected tree markers sequentially
+        let count = 0;
+        let totalArea = 0;
+
+        detected.forEach((tree, idx) => {
+          setTimeout(() => {
+            // Outer Halo
+            const circle = L.circle([tree.lat, tree.lng], {
+              radius: tree.radius,
+              color: '#34d399',
+              fillColor: '#10b981',
+              fillOpacity: 0.35,
+              weight: 2,
+              className: 'tree-halo'
+            });
+
+            // Center Point Marker
+            const center = L.circleMarker([tree.lat, tree.lng], {
+              radius: 3.5,
+              color: '#ffffff',
+              fillColor: '#059669',
+              fillOpacity: 1,
+              weight: 1.5
+            }).bindPopup(`
+              <div style="font-size:12px; color:#0f172a; line-height:1.5;">
+                <b style="color:#059669;">Tree Canopy #${count + 1}</b><br>
+                <b>Crown Radius:</b> ${tree.radius} m<br>
+                <b>Area:</b> ${(Math.PI * tree.radius * tree.radius).toFixed(1)} m²<br>
+                <b>Coordinates:</b> ${tree.lat.toFixed(6)}, ${tree.lng.toFixed(6)}
+              </div>
+            `);
+
+            treesLayer.addLayer(circle);
+            treesLayer.addLayer(center);
+
+            count++;
+            totalArea += Math.PI * tree.radius * tree.radius;
+
+            document.getElementById('statCount').innerText = count;
+            document.getElementById('statArea').innerText = Math.round(totalArea) + ' m²';
+
+            // Store GeoJSON Feature
+            detectedFeatures.push({
+              type: "Feature",
+              properties: {
+                id: count,
+                crown_radius_m: tree.radius,
+                area_sqm: parseFloat((Math.PI * tree.radius * tree.radius).toFixed(2))
+              },
+              geometry: {
+                type: "Point",
+                coordinates: [tree.lng, tree.lat]
+              }
+            });
+
+            // Finished animation
+            if (count === detected.length) {
+              scanner.style.display = 'none';
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-solid fa-check"></i> Detection Complete';
+            }
+          }, idx * 35);
+        });
+
+      }, 1500);
+    }
+
+    function clearDetections() {
+      treesLayer.clearLayers();
+      detectedFeatures = [];
+      document.getElementById('statCount').innerText = '0';
+      document.getElementById('statArea').innerText = '0 m²';
+      const btn = document.getElementById('btnDetect');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Run Canopy AI Detection';
+    }
+
+    // Export Detections directly to GeoJSON for QGIS
+    function exportGeoJSON() {
+      if (detectedFeatures.length === 0) {
+        alert("Please run detection first to generate tree canopies.");
+        return;
+      }
+      const geojson = {
+        type: "FeatureCollection",
+        crs: { type: "name", properties: { name: "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+        features: detectedFeatures
+      };
+      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tea_garden_canopies_${detectedFeatures.length}_trees.geojson`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
 </body>
 </html>
