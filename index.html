@@ -67,7 +67,7 @@
     .ai-suite {
       position: absolute; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 1000;
       width: 320px; background: var(--card-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--border); border-radius: 16px; padding: 18px;
+      border: 1px solid var(--border); border-radius: 16px; padding: 16px;
       box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 25px rgba(0, 240, 255, 0.1);
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
@@ -106,16 +106,17 @@
     }
     .stat-card {
       background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 8px; padding: 10px; text-align: center; position: relative; overflow: hidden;
+      border-radius: 8px; padding: 8px 6px; text-align: center; position: relative; overflow: hidden;
     }
     .stat-card::after {
       content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
       background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
     }
-    .stat-card span { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
-    .stat-card strong { display: block; font-size: 13.5px; color: #fff; margin-top: 3px; font-weight: 800; font-family: monospace; }
+    .stat-card span { font-size: 8.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; }
+    .stat-card strong { display: block; font-size: 12.5px; color: #fff; margin-top: 3px; font-weight: 800; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .stat-green strong { color: var(--neon-green); text-shadow: 0 0 10px rgba(0, 255, 157, 0.4); }
     .stat-amber strong { color: var(--neon-amber); text-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
+    .stat-cyan strong { color: var(--neon-cyan); text-shadow: 0 0 10px rgba(0, 240, 255, 0.4); }
 
     .action-row { display: flex; gap: 8px; margin-top: 12px; }
     .action-btn {
@@ -193,6 +194,10 @@
           <input type="checkbox" id="chkBoundary" checked onchange="toggleLayer('boundary', this.checked)">
         </label>
         <label class="toggle-row">
+          <span><i class="fa-solid fa-seedling" style="color:var(--neon-green); margin-right:6px;"></i> Cultivated Zone</span>
+          <input type="checkbox" id="chkPlanted" checked onchange="toggleLayer('planted', this.checked)">
+        </label>
+        <label class="toggle-row">
           <span><i class="fa-solid fa-border-all" style="color:var(--neon-amber); margin-right:6px;"></i> Empty Patches</span>
           <input type="checkbox" id="chkGaps" checked onchange="toggleLayer('gaps', this.checked)">
         </label>
@@ -224,13 +229,17 @@
           <span>Empty Patches</span>
           <strong id="statGapCount">0</strong>
         </div>
-        <div class="stat-card">
-          <span>Plantable Patch Area</span>
-          <strong id="statGapArea">0 m²</strong>
-        </div>
-        <div class="stat-card">
+        <div class="stat-card stat-cyan">
           <span>Boundary Area</span>
           <strong id="statBoundaryArea">0 m²</strong>
+        </div>
+        <div class="stat-card stat-green">
+          <span>Cultivated Area</span>
+          <strong id="statPlantedArea">0 m²</strong>
+        </div>
+        <div class="stat-card stat-amber" style="grid-column: span 2;">
+          <span>Empty Patch Area</span>
+          <strong id="statGapArea">0 m²</strong>
         </div>
       </div>
 
@@ -290,14 +299,14 @@
     // Stored raw areas in square meters
     let rawBoundaryAreaSqM = 0;
     let rawGapAreaSqM = 0;
+    let rawPlantedAreaSqM = 0;
 
-    // Vector Layer Groups
+    // Vector Layers
     let boundaryLayer = L.geoJSON(null, {
       style: {
         color: '#00f0ff',
         weight: 2.5,
-        fillColor: '#00f0ff',
-        fillOpacity: 0.08,
+        fillColor: 'transparent',
         dashArray: '5, 5'
       },
       onEachFeature: (feature, layer) => {
@@ -305,23 +314,35 @@
       }
     }).addTo(map);
 
+    // Planted Cultivated Zone Layer (Boundary filled with Green backdrop)
+    let plantedLayer = L.geoJSON(null, {
+      style: {
+        color: '#00ff9d',
+        weight: 1,
+        fillColor: '#00ff9d',
+        fillOpacity: 0.08,
+        dashArray: '2, 4'
+      },
+      interactive: false
+    }).addTo(map);
+
     let emptyPatchLayer = L.geoJSON(null, {
       style: {
         color: '#f59e0b',
         weight: 2,
         fillColor: '#f59e0b',
-        fillOpacity: 0.35,
+        fillOpacity: 0.4,
         dashArray: '4, 4'
       },
       onEachFeature: (feature, layer) => {
-        layer.bindPopup(`<b style="color:#d97706;">Empty Plantable Patch</b><br/>Ready for Bamboo / Tea Infill`);
+        layer.bindPopup(`<b style="color:#d97706;">Empty Plantable Patch</b><br/>Target Infill Area`);
       }
     }).addTo(map);
 
     let treeLayer = L.geoJSON(null, {
       pointToLayer: (feature, latlng) => {
         return L.circleMarker(latlng, {
-          radius: 5,
+          radius: 4.5,
           fillColor: "#00ff9d",
           color: "#059669",
           weight: 1.5,
@@ -335,12 +356,12 @@
       }
     }).addTo(map);
 
-    // Assam DLR & Standard Area Unit Converter
-    // 1 Bigha (Assam) = 14,400 sq ft = 1,337.8038 sq m
-    // 1 Bigha = 5 Katha (1 Katha = 267.56 sq m)
-    // 1 Katha = 20 Lessa (1 Lessa = 13.378 sq m)
+    // Assam DLR Criteria
+    // 1 Bigha = 14,400 sq ft = 1,337.8038 sq m
+    // 1 Bigha = 5 Katha (1 Katha = 267.56076 sq m)
+    // 1 Katha = 20 Lessa (1 Lessa = 13.378038 sq m)
     function formatAreaByUnit(sqmMeters, unit) {
-      if (!sqmMeters || sqmMeters <= 0) return `0 ${unit}`;
+      if (!sqmMeters || sqmMeters <= 0) return `0`;
 
       switch (unit) {
         case 'sqm':
@@ -350,7 +371,7 @@
           return `${(sqmMeters / 10000).toFixed(3)} Ha`;
 
         case 'acre':
-          return `${(sqmMeters / 4046.8564224).toFixed(3)} Acres`;
+          return `${(sqmMeters / 4046.8564224).toFixed(3)} Ac`;
 
         case 'bigha_dec': {
           const bigha = sqmMeters / 1337.8038;
@@ -371,7 +392,7 @@
 
           const lessa = (rem / SQM_PER_LESSA).toFixed(1);
 
-          return `${bigha}B - ${katha}K - ${lessa}L`;
+          return `${bigha}B ${katha}K ${lessa}L`;
         }
 
         default:
@@ -381,8 +402,14 @@
 
     function updateAreaDisplays() {
       const selectedUnit = document.getElementById('unitSelector').value;
+      rawPlantedAreaSqM = Math.max(0, rawBoundaryAreaSqM - rawGapAreaSqM);
+
       document.getElementById('statBoundaryArea').innerText = formatAreaByUnit(rawBoundaryAreaSqM, selectedUnit);
       document.getElementById('statGapArea').innerText = formatAreaByUnit(rawGapAreaSqM, selectedUnit);
+      
+      const plantedText = formatAreaByUnit(rawPlantedAreaSqM, selectedUnit);
+      const plantedPct = rawBoundaryAreaSqM > 0 ? ((rawPlantedAreaSqM / rawBoundaryAreaSqM) * 100).toFixed(1) : 0;
+      document.getElementById('statPlantedArea').innerText = `${plantedText} (${plantedPct}%)`;
     }
 
     // Geodesic Polygon Area Calculation in m²
@@ -425,6 +452,10 @@
           const boundaryData = await boundaryRes.json();
           boundaryLayer.clearLayers();
           boundaryLayer.addData(boundaryData);
+
+          plantedLayer.clearLayers();
+          plantedLayer.addData(boundaryData);
+
           rawBoundaryAreaSqM = computeLayerArea(boundaryData);
           if (boundaryLayer.getBounds().isValid()) {
             map.fitBounds(boundaryLayer.getBounds());
@@ -465,6 +496,8 @@
     function toggleLayer(layerName, state) {
       if (layerName === 'boundary') {
         state ? map.addLayer(boundaryLayer) : map.removeLayer(boundaryLayer);
+      } else if (layerName === 'planted') {
+        state ? map.addLayer(plantedLayer) : map.removeLayer(plantedLayer);
       } else if (layerName === 'gaps') {
         state ? map.addLayer(emptyPatchLayer) : map.removeLayer(emptyPatchLayer);
       } else if (layerName === 'trees') {
