@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Tea Garden AI Sentinel | Canopy & Gap Computer Vision</title>
+  <title>Tea Garden AI Sentinel | QGIS Layers & Canopy CV</title>
   
   <!-- Leaflet & FontAwesome -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -12,7 +12,7 @@
   <style>
     :root {
       --bg: #030712;
-      --card-bg: rgba(10, 15, 29, 0.82);
+      --card-bg: rgba(10, 15, 29, 0.85);
       --border: rgba(56, 189, 248, 0.2);
       --border-glow: rgba(56, 189, 248, 0.4);
       --accent: #10b981;
@@ -41,7 +41,7 @@
       background-size: 50px 50px;
     }
 
-    /* Reticle Targets in Corners */
+    /* Reticle Targets */
     .reticle {
       position: absolute; width: 18px; height: 18px; border: 2px solid var(--neon-cyan);
       pointer-events: none; z-index: 500; opacity: 0.6;
@@ -64,7 +64,7 @@
     }
     .hud-title span { display: block; font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: 0.8px; }
 
-    /* AI Detection Suite Floating Deck */
+    /* Control Deck */
     .ai-suite {
       position: absolute; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 1000;
       width: 320px; background: var(--card-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
@@ -79,37 +79,19 @@
       box-shadow: 0 0 12px var(--neon-green); animation: pulse 1.8s infinite; 
     }
 
-    /* Cyber Button Grid */
-    .btn-row { display: flex; gap: 8px; margin-bottom: 12px; }
-    .ai-btn-detect {
-      flex: 1; background: linear-gradient(135deg, rgba(0, 255, 157, 0.15), rgba(0, 240, 255, 0.25));
-      color: #fff; border: 1px solid var(--neon-green); padding: 11px 8px; font-size: 11px; font-weight: 700;
-      letter-spacing: 0.8px; border-radius: 8px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      box-shadow: 0 0 15px rgba(0, 255, 157, 0.2); transition: all 0.2s;
-      text-transform: uppercase;
+    /* Layer Switches */
+    .layer-controls {
+      display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px;
     }
-    .ai-btn-detect:hover { background: linear-gradient(135deg, rgba(0, 255, 157, 0.3), rgba(0, 240, 255, 0.4)); box-shadow: 0 0 20px rgba(0, 255, 157, 0.4); }
-    .ai-btn-gap {
-      border-color: var(--neon-amber);
-      background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(239, 68, 68, 0.2));
-      box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+    .toggle-row {
+      display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #cbd5e1;
     }
-    .ai-btn-gap:hover { background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(239, 68, 68, 0.35)); box-shadow: 0 0 20px rgba(245, 158, 11, 0.4); }
-    .ai-btn-detect:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .control-group { margin-top: 10px; }
-    .control-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.8px; }
-    .control-group input[type=range] { 
-      width: 100%; height: 4px; accent-color: var(--neon-cyan); background: #1e293b; border-radius: 2px; -webkit-appearance: none; 
-    }
-    .control-group input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan);
-    }
+    .toggle-row input[type="checkbox"] { accent-color: var(--neon-cyan); cursor: pointer; }
 
     /* Stats Grid */
     .stats-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;
     }
     .stat-card {
       background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);
@@ -120,11 +102,11 @@
       background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
     }
     .stat-card span { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
-    .stat-card strong { display: block; font-size: 16px; color: #fff; margin-top: 3px; font-weight: 800; font-family: monospace; }
+    .stat-card strong { display: block; font-size: 15px; color: #fff; margin-top: 3px; font-weight: 800; font-family: monospace; }
     .stat-green strong { color: var(--neon-green); text-shadow: 0 0 10px rgba(0, 255, 157, 0.4); }
     .stat-amber strong { color: var(--neon-amber); text-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
 
-    .action-row { display: flex; gap: 8px; margin-top: 14px; }
+    .action-row { display: flex; gap: 8px; margin-top: 12px; }
     .action-btn {
       flex: 1; background: #0f172a; color: #cbd5e1; border: 1px solid var(--border);
       padding: 9px; font-size: 10px; font-weight: 700; border-radius: 6px; cursor: pointer;
@@ -142,39 +124,11 @@
     }
     .hud-bottom span { color: var(--muted); }
 
-    /* Radar Scanning Beam */
-    #scanner-line {
-      position: absolute; top: 0; left: 0; width: 100%; height: 3px;
-      background: linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-green), transparent);
-      box-shadow: 0 0 25px var(--neon-green), 0 0 45px var(--neon-cyan);
-      z-index: 600; display: none; pointer-events: none;
-    }
-
-    @keyframes scanSweep {
-      0% { top: 0%; opacity: 0.3; }
-      50% { opacity: 1; }
-      100% { top: 100%; opacity: 0.3; }
-    }
-
-    .tree-halo {
-      border: 2px solid #00ff9d; border-radius: 50%; background: rgba(0, 255, 157, 0.25);
-      box-shadow: 0 0 14px rgba(0, 255, 157, 0.8); animation: treePulse 2s ease-in-out infinite;
-    }
-    .gap-halo {
-      border: 2px dashed #f59e0b; border-radius: 6px; background: rgba(245, 158, 11, 0.3);
-      box-shadow: 0 0 12px rgba(245, 158, 11, 0.7);
-    }
-
-    @keyframes treePulse {
-      0%, 100% { transform: scale(0.95); opacity: 0.7; }
-      50% { transform: scale(1.08); opacity: 1; }
-    }
     @keyframes pulse {
       0%, 100% { transform: scale(0.9); opacity: 0.5; }
       50% { transform: scale(1.2); opacity: 1; }
     }
 
-    /* Mobile Responsive Scaffold */
     @media (max-width: 768px) {
       .hud-title { padding: 8px 12px; }
       .hud-title h1 { font-size: 11px; }
@@ -205,16 +159,15 @@
   <div class="reticle reticle-tr"></div>
   <div class="reticle reticle-bl"></div>
   <div class="reticle reticle-br"></div>
-  <div id="scanner-line"></div>
 
   <div class="hud-title">
-    <h1><i class="fa-solid fa-crosshairs"></i> Tea AI Vision Sentinel</h1>
-    <span>EPSG:3857 · Orthomosaic Spectral Neural CV</span>
+    <h1><i class="fa-solid fa-layer-group"></i> Tea Plantation Sentinel</h1>
+    <span>EPSG:4326 / 3857 · QGIS GeoJSON Ground Truth</span>
   </div>
 
   <div class="ai-suite" id="aiSuite">
     <div class="suite-header" onclick="toggleSuite()">
-      <h3>Computer Vision Deck</h3>
+      <h3>Vector Layers & GIS</h3>
       <div style="display:flex; align-items:center; gap:8px;">
         <div class="pulse-indicator"></div>
         <i class="fa-solid fa-chevron-down" id="suiteToggleIcon" style="font-size:11px; color:var(--muted);"></i>
@@ -222,53 +175,45 @@
     </div>
 
     <div class="suite-body">
-      <div class="btn-row">
-        <button class="ai-btn-detect" id="btnCanopy" onclick="runVisionModel('canopy')">
-          <i class="fa-solid fa-tree"></i> Canopy AI
-        </button>
-        <button class="ai-btn-detect ai-btn-gap" id="btnGap" onclick="runVisionModel('gap')">
-          <i class="fa-solid fa-vector-square"></i> Detect Gaps
-        </button>
+      <!-- Layer Toggle Controls -->
+      <div class="layer-controls">
+        <label class="toggle-row">
+          <span><i class="fa-solid fa-draw-polygon" style="color:var(--neon-cyan); margin-right:6px;"></i> Garden Boundary</span>
+          <input type="checkbox" id="chkBoundary" checked onchange="toggleLayer('boundary', this.checked)">
+        </label>
+        <label class="toggle-row">
+          <span><i class="fa-solid fa-border-all" style="color:var(--neon-amber); margin-right:6px;"></i> Empty Patches</span>
+          <input type="checkbox" id="chkGaps" checked onchange="toggleLayer('gaps', this.checked)">
+        </label>
+        <label class="toggle-row">
+          <span><i class="fa-solid fa-tree" style="color:var(--neon-green); margin-right:6px;"></i> Tree Annotations</span>
+          <input type="checkbox" id="chkTrees" checked onchange="toggleLayer('trees', this.checked)">
+        </label>
       </div>
 
-      <div class="control-group">
-        <div class="control-label">
-          <span>Spectral Threshold</span>
-          <span id="thresh-val">0.35</span>
-        </div>
-        <input type="range" id="sensitivity" min="0.15" max="0.65" step="0.02" value="0.35" oninput="document.getElementById('thresh-val').innerText = this.value" />
-      </div>
-
-      <div class="control-group">
-        <div class="control-label">
-          <span>Target Scale / Radius</span>
-          <span id="radius-val">2.8 m</span>
-        </div>
-        <input type="range" id="crownRadius" min="1.2" max="5.0" step="0.2" value="2.8" oninput="document.getElementById('radius-val').innerText = this.value + ' m'" />
-      </div>
-
+      <!-- Live Analytics Stats -->
       <div class="stats-grid">
         <div class="stat-card stat-green">
-          <span>Canopy Crowns</span>
+          <span>Trees (QGIS)</span>
           <strong id="statTreeCount">0</strong>
         </div>
         <div class="stat-card stat-amber">
-          <span>Empty Infill Gaps</span>
+          <span>Empty Patches</span>
           <strong id="statGapCount">0</strong>
         </div>
         <div class="stat-card">
-          <span>Canopy Area</span>
-          <strong id="statTreeArea">0 m²</strong>
+          <span>Plantable Patch Area</span>
+          <strong id="statGapArea">0 m²</strong>
         </div>
         <div class="stat-card">
-          <span>Plantable Space</span>
-          <strong id="statGapArea">0 m²</strong>
+          <span>Boundary Area</span>
+          <strong id="statBoundaryArea">0 m²</strong>
         </div>
       </div>
 
       <div class="action-row">
-        <button class="action-btn" onclick="exportCombinedGeoJSON()"><i class="fa-solid fa-download"></i> GeoJSON</button>
-        <button class="action-btn" onclick="clearDetections()"><i class="fa-solid fa-trash"></i> Reset</button>
+        <button class="action-btn" onclick="zoomToBoundary()"><i class="fa-solid fa-expand"></i> Fit Site</button>
+        <button class="action-btn" onclick="reloadLayers()"><i class="fa-solid fa-rotate-right"></i> Reload</button>
       </div>
     </div>
   </div>
@@ -300,10 +245,8 @@
     const map = L.map('map', {
       center: SITE_CENTER,
       zoom: 18,
-      minZoom: 16,
+      minZoom: 14,
       maxZoom: 22,
-      maxBounds: SITE_BOUNDS.pad(0.15),
-      maxBoundsViscosity: 1.0,
       zoomControl: false,
       attributionControl: false
     });
@@ -316,267 +259,161 @@
       bounds: SITE_BOUNDS
     }).addTo(map);
 
-    const treesLayer = L.layerGroup().addTo(map);
-    const gapsLayer = L.layerGroup().addTo(map);
-
-    let detectedCanopies = [];
-    let detectedGaps = [];
-
     map.on('mousemove', (e) => {
       document.getElementById('coords-text').innerText = 
         `Lat: ${e.latlng.lat.toFixed(5)} | Lng: ${e.latlng.lng.toFixed(5)} | Z: ${map.getZoom()}`;
     });
 
-    // Unified Optical Computer Vision Model
-    function runVisionModel(mode) {
-      const scanner = document.getElementById('scanner-line');
-      const btnCanopy = document.getElementById('btnCanopy');
-      const btnGap = document.getElementById('btnGap');
-
-      btnCanopy.disabled = true;
-      btnGap.disabled = true;
-      scanner.style.display = 'block';
-      scanner.style.animation = 'scanSweep 1.8s linear infinite';
-
-      const tileImages = Array.from(document.querySelectorAll('.leaflet-tile-pane img'))
-        .filter(img => img.complete && img.naturalWidth > 0);
-
-      if (tileImages.length === 0) {
-        alert("Tiles are loading. Please wait 2 seconds.");
-        resetButtons();
-        return;
+    // Vector GeoJSON Layer Groups
+    let boundaryLayer = L.geoJSON(null, {
+      style: {
+        color: '#00f0ff',
+        weight: 2.5,
+        fillColor: '#00f0ff',
+        fillOpacity: 0.08,
+        dashArray: '5, 5'
+      },
+      onEachFeature: (feature, layer) => {
+        layer.bindPopup(`<b style="color:#0284c7;">Plot Boundary</b><br/>Garden Boundary Section`);
       }
+    }).addTo(map);
 
-      const mapSize = map.getSize();
-      const cvCanvas = document.createElement('canvas');
-      cvCanvas.width = mapSize.x;
-      cvCanvas.height = mapSize.y;
-      const ctx = cvCanvas.getContext('2d', { willReadFrequently: true });
-      const mapRect = map.getContainer().getBoundingClientRect();
-
-      tileImages.forEach(img => {
-        const rect = img.getBoundingClientRect();
-        try {
-          ctx.drawImage(img, rect.left - mapRect.left, rect.top - mapRect.top, rect.width, rect.height);
-        } catch (e) {}
-      });
-
-      setTimeout(() => {
-        let imgData;
-        try {
-          imgData = ctx.getImageData(0, 0, cvCanvas.width, cvCanvas.height);
-        } catch (err) {
-          console.warn("Direct pixel access sandboxed. Executing synthetic spectral model.");
-          runFallbackScan(mode);
-          return;
-        }
-
-        const pixels = imgData.data;
-        const w = cvCanvas.width;
-        const h = cvCanvas.height;
-
-        const sensitivity = parseFloat(document.getElementById('sensitivity').value);
-        const radiusMeters = parseFloat(document.getElementById('crownRadius').value);
-
-        const centerLatLng = map.getCenter();
-        const p1 = map.latLngToContainerPoint(centerLatLng);
-        const p2 = map.latLngToContainerPoint([centerLatLng.lat, centerLatLng.lng + 0.0001]);
-        const metersPerPixel = (0.0001 * 111320 * Math.cos(centerLatLng.lat * Math.PI / 180)) / Math.abs(p2.x - p1.x);
-        const minDistancePx = Math.max(12, Math.round(radiusMeters / metersPerPixel));
-
-        if (mode === 'canopy') {
-          processCanopies(pixels, w, h, sensitivity, minDistancePx, radiusMeters);
-        } else {
-          processEmptyGaps(pixels, w, h, sensitivity, minDistancePx, radiusMeters);
-        }
-      }, 350);
-    }
-
-    // 1. Canopy Peak Detection
-    function processCanopies(pixels, w, h, sensitivity, minDistancePx, radiusMeters) {
-      treesLayer.clearLayers();
-      detectedCanopies = [];
-      const exgGrid = new Float32Array(w * h);
-
-      for (let y = 0; y < h; y += 2) {
-        for (let x = 0; x < w; x += 2) {
-          const idx = (y * w + x) * 4;
-          const r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2], a = pixels[idx + 3];
-          if (a < 50 || (r <= 20 && g <= 20 && b <= 20)) { exgGrid[y * w + x] = -999; continue; }
-          const exg = (2 * g - r - b);
-          exgGrid[y * w + x] = (exg > (sensitivity * 65) && g > r) ? exg : -999;
-        }
+    let emptyPatchLayer = L.geoJSON(null, {
+      style: {
+        color: '#f59e0b',
+        weight: 2,
+        fillColor: '#f59e0b',
+        fillOpacity: 0.35,
+        dashArray: '4, 4'
+      },
+      onEachFeature: (feature, layer) => {
+        let areaText = feature.properties && feature.properties.area ? `${feature.properties.area} m²` : 'Calculated';
+        layer.bindPopup(`<b style="color:#d97706;">Empty Plantable Patch</b><br/>Ready for Bamboo / Tea Infill`);
       }
+    }).addTo(map);
 
-      const peaks = [];
-      const step = 4;
-      for (let y = minDistancePx; y < h - minDistancePx; y += step) {
-        for (let x = minDistancePx; x < w - minDistancePx; x += step) {
-          const val = exgGrid[y * w + x];
-          if (val <= 0) continue;
-          let isMax = true;
-          for (let dy = -minDistancePx; dy <= minDistancePx; dy += step) {
-            for (let dx = -minDistancePx; dx <= minDistancePx; dx += step) {
-              if (dx === 0 && dy === 0) continue;
-              if (exgGrid[(y + dy) * w + (x + dx)] >= val) { isMax = false; break; }
-            }
-            if (!isMax) break;
-          }
-          if (isMax) {
-            const latlng = map.containerPointToLatLng([x, y]);
-            if (SITE_BOUNDS.contains(latlng)) peaks.push({ latlng, val });
-          }
-        }
-      }
-      renderCanopies(peaks, radiusMeters);
-    }
-
-    // 2. Empty Space / Fallow Gap Detection
-    function processEmptyGaps(pixels, w, h, sensitivity, minDistancePx, radiusMeters) {
-      gapsLayer.clearLayers();
-      detectedGaps = [];
-      const gapGrid = new Uint8Array(w * h);
-
-      for (let y = 0; y < h; y += 3) {
-        for (let x = 0; x < w; x += 3) {
-          const idx = (y * w + x) * 4;
-          const r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2], a = pixels[idx + 3];
-          if (a < 50 || (r <= 15 && g <= 15 && b <= 15)) continue;
-          const exg = (2 * g - r - b);
-          const brightness = (r + g + b) / 3;
-          // Empty soil/fallow has low vegetative index & balanced brightness
-          if (exg < (sensitivity * 25) && brightness > 45 && brightness < 210) {
-            gapGrid[y * w + x] = 1;
-          }
-        }
-      }
-
-      const gapCenters = [];
-      const step = minDistancePx * 1.5;
-      for (let y = minDistancePx; y < h - minDistancePx; y += step) {
-        for (let x = minDistancePx; x < w - minDistancePx; x += step) {
-          let soilHits = 0;
-          for (let dy = -minDistancePx / 2; dy <= minDistancePx / 2; dy += 3) {
-            for (let dx = -minDistancePx / 2; dx <= minDistancePx / 2; dx += 3) {
-              if (gapGrid[Math.floor(y + dy) * w + Math.floor(x + dx)] === 1) soilHits++;
-            }
-          }
-          if (soilHits > 18) {
-            const latlng = map.containerPointToLatLng([x, y]);
-            if (SITE_BOUNDS.contains(latlng)) gapCenters.push({ latlng, hits: soilHits });
-          }
-        }
-      }
-      renderGaps(gapCenters, radiusMeters);
-    }
-
-    function renderCanopies(peaks, baseRadius) {
-      let area = 0;
-      peaks.forEach((p, i) => {
-        const radius = parseFloat((baseRadius * (0.85 + Math.min(p.val / 150, 0.35))).toFixed(1));
-        const circle = L.circle(p.latlng, {
-          radius: radius, color: '#00ff9d', fillColor: '#10b981', fillOpacity: 0.35, weight: 2, className: 'tree-halo'
-        }).bindPopup(`
-          <div style="font-size:12px; color:#0f172a; line-height:1.4;">
-            <b style="color:#059669;">Canopy Crown #${i+1}</b><br/>
-            <b>Radius:</b> ${radius} m | <b>Area:</b> ${(Math.PI * radius * radius).toFixed(1)} m²
-          </div>
-        `);
-        treesLayer.addLayer(circle);
-        area += Math.PI * radius * radius;
-        detectedCanopies.push({
-          type: "Feature",
-          properties: { class: "canopy", id: i + 1, radius_m: radius, area_sqm: parseFloat((Math.PI * radius * radius).toFixed(1)) },
-          geometry: { type: "Point", coordinates: [p.latlng.lng, p.latlng.lat] }
+    let treeLayer = L.geoJSON(null, {
+      pointToLayer: (feature, latlng) => {
+        return L.circleMarker(latlng, {
+          radius: 5,
+          fillColor: "#00ff9d",
+          color: "#059669",
+          weight: 1.5,
+          opacity: 1,
+          fillOpacity: 0.85
         });
-      });
-      document.getElementById('statTreeCount').innerText = peaks.length;
-      document.getElementById('statTreeArea').innerText = Math.round(area) + ' m²';
-      resetButtons();
-    }
+      },
+      onEachFeature: (feature, layer) => {
+        const id = feature.properties ? (feature.properties.id || feature.properties.fid || '') : '';
+        layer.bindPopup(`<b style="color:#059669;">Tea Tree Crown</b><br/>QGIS Vector Point: ${id}`);
+      }
+    }).addTo(map);
 
-    function renderGaps(gaps, baseRadius) {
+    // Approximate planar geodesic polygon area in m²
+    function calculatePolyArea(coords) {
+      if (!coords || coords.length < 3) return 0;
       let area = 0;
-      gaps.forEach((g, i) => {
-        const gapRadius = parseFloat((baseRadius * 1.25).toFixed(1));
-        const circle = L.circle(g.latlng, {
-          radius: gapRadius, color: '#f59e0b', fillColor: '#d97706', fillOpacity: 0.4, weight: 2, dashArray: '4,4', className: 'gap-halo'
-        }).bindPopup(`
-          <div style="font-size:12px; color:#0f172a; line-height:1.4;">
-            <b style="color:#d97706;">Plantable Infill Gap #${i+1}</b><br/>
-            <b>Gap Footprint:</b> ${(Math.PI * gapRadius * gapRadius).toFixed(1)} m²<br/>
-            <b>Target Infill:</b> Suitable for High-Density Planting
-          </div>
-        `);
-        gapsLayer.addLayer(circle);
-        area += Math.PI * gapRadius * gapRadius;
-        detectedGaps.push({
-          type: "Feature",
-          properties: { class: "plantable_gap", id: i + 1, area_sqm: parseFloat((Math.PI * gapRadius * gapRadius).toFixed(1)) },
-          geometry: { type: "Point", coordinates: [g.latlng.lng, g.latlng.lat] }
-        });
-      });
-      document.getElementById('statGapCount').innerText = gaps.length;
-      document.getElementById('statGapArea').innerText = Math.round(area) + ' m²';
-      resetButtons();
+      const radius = 6378137; // WGS84
+      for (let i = 0; i < coords.length; i++) {
+        let p1 = coords[i];
+        let p2 = coords[(i + 1) % coords.length];
+        let lon1 = p1[0] * Math.PI / 180;
+        let lat1 = p1[1] * Math.PI / 180;
+        let lon2 = p2[0] * Math.PI / 180;
+        let lat2 = p2[1] * Math.PI / 180;
+        area += (lon2 - lon1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+      }
+      area = Math.abs(area * radius * radius / 2.0);
+      return area;
     }
 
-    function runFallbackScan(mode) {
-      const radius = parseFloat(document.getElementById('crownRadius').value);
-      const points = [];
-      const rows = 12, cols = 12;
-      const dLat = (NE_CORNER[0] - SW_CORNER[0]) / rows;
-      const dLng = (NE_CORNER[1] - SW_CORNER[1]) / cols;
+    function computeLayerArea(geojsonData) {
+      let totalArea = 0;
+      if (!geojsonData || !geojsonData.features) return 0;
+      geojsonData.features.forEach(f => {
+        if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
+          const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+          polys.forEach(ring => {
+            totalArea += calculatePolyArea(ring[0]);
+          });
+        }
+      });
+      return Math.round(totalArea);
+    }
 
-      for (let r = 1; r < rows; r++) {
-        for (let c = 1; c < cols; c++) {
-          const lat = SW_CORNER[0] + dLat * r;
-          const lng = SW_CORNER[1] + dLng * c;
-          if ((r + c) % (mode === 'canopy' ? 2 : 3) === 0) {
-            points.push({ latlng: L.latLng(lat, lng), val: 40 });
+    // Load QGIS GeoJSON Files
+    async function loadGeoJSONData() {
+      try {
+        // 1. Boundary.geojson
+        const boundaryRes = await fetch('./Boundary.geojson');
+        if (boundaryRes.ok) {
+          const boundaryData = await boundaryRes.json();
+          boundaryLayer.clearLayers();
+          boundaryLayer.addData(boundaryData);
+          const bArea = computeLayerArea(boundaryData);
+          document.getElementById('statBoundaryArea').innerText = bArea > 0 ? `${bArea.toLocaleString()} m²` : 'Active';
+          if (boundaryLayer.getBounds().isValid()) {
+            map.fitBounds(boundaryLayer.getBounds());
           }
         }
+      } catch (e) {
+        console.warn('Could not load Boundary.geojson:', e);
       }
-      if (mode === 'canopy') renderCanopies(points, radius);
-      else renderGaps(points, radius);
-    }
 
-    function resetButtons() {
-      document.getElementById('scanner-line').style.display = 'none';
-      document.getElementById('btnCanopy').disabled = false;
-      document.getElementById('btnGap').disabled = false;
-    }
-
-    function clearDetections() {
-      treesLayer.clearLayers();
-      gapsLayer.clearLayers();
-      detectedCanopies = [];
-      detectedGaps = [];
-      document.getElementById('statTreeCount').innerText = '0';
-      document.getElementById('statGapCount').innerText = '0';
-      document.getElementById('statTreeArea').innerText = '0 m²';
-      document.getElementById('statGapArea').innerText = '0 m²';
-      resetButtons();
-    }
-
-    function exportCombinedGeoJSON() {
-      const allFeatures = [...detectedCanopies, ...detectedGaps];
-      if (allFeatures.length === 0) {
-        alert("Run either Canopy or Gap detection first.");
-        return;
+      try {
+        // 2. Empty_Patch.geojson
+        const patchRes = await fetch('./Empty_Patch.geojson');
+        if (patchRes.ok) {
+          const patchData = await patchRes.json();
+          emptyPatchLayer.clearLayers();
+          emptyPatchLayer.addData(patchData);
+          document.getElementById('statGapCount').innerText = patchData.features ? patchData.features.length : 0;
+          const pArea = computeLayerArea(patchData);
+          document.getElementById('statGapArea').innerText = `${pArea.toLocaleString()} m²`;
+        }
+      } catch (e) {
+        console.warn('Could not load Empty_Patch.geojson:', e);
       }
-      const geojson = {
-        type: "FeatureCollection",
-        features: allFeatures
-      };
-      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `tea_garden_ai_features_${allFeatures.length}.geojson`;
-      a.click();
-      URL.revokeObjectURL(url);
+
+      try {
+        // 3. Tree.geojson
+        const treeRes = await fetch('./Tree.geojson');
+        if (treeRes.ok) {
+          const treeData = await treeRes.json();
+          treeLayer.clearLayers();
+          treeLayer.addData(treeData);
+          document.getElementById('statTreeCount').innerText = treeData.features ? treeData.features.length : 0;
+        }
+      } catch (e) {
+        console.warn('Could not load Tree.geojson:', e);
+      }
     }
+
+    // Layer control handler
+    function toggleLayer(layerName, state) {
+      if (layerName === 'boundary') {
+        state ? map.addLayer(boundaryLayer) : map.removeLayer(boundaryLayer);
+      } else if (layerName === 'gaps') {
+        state ? map.addLayer(emptyPatchLayer) : map.removeLayer(emptyPatchLayer);
+      } else if (layerName === 'trees') {
+        state ? map.addLayer(treeLayer) : map.removeLayer(treeLayer);
+      }
+    }
+
+    function zoomToBoundary() {
+      if (boundaryLayer.getLayers().length > 0 && boundaryLayer.getBounds().isValid()) {
+        map.fitBounds(boundaryLayer.getBounds());
+      } else {
+        map.fitBounds(SITE_BOUNDS);
+      }
+    }
+
+    function reloadLayers() {
+      loadGeoJSONData();
+    }
+
+    // Initialize on page load
+    loadGeoJSONData();
   </script>
 </body>
 </html>
