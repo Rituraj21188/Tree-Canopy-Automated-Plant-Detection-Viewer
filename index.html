@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Tea Garden AI Sentinel | QGIS Layers & Canopy CV</title>
+  <title>Tea Plantation Sentinel | Canopy & Spatial Analytics</title>
   
   <!-- Leaflet & FontAwesome -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -26,7 +26,6 @@
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
     html, body { width: 100%; height: 100%; height: 100dvh; background: var(--bg); color: var(--text); overflow: hidden; }
 
-    /* Spatial Canvas Map */
     #map {
       width: 100%; height: 100%;
       background: #020408;
@@ -72,7 +71,7 @@
       box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 25px rgba(0, 240, 255, 0.1);
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .suite-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; cursor: pointer; }
+    .suite-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; cursor: pointer; }
     .suite-header h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--neon-cyan); font-weight: 800; }
     .pulse-indicator { 
       width: 8px; height: 8px; border-radius: 50%; background: var(--neon-green); 
@@ -81,7 +80,7 @@
 
     /* Layer Switches */
     .layer-controls {
-      display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;
+      display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;
       background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px;
     }
     .toggle-row {
@@ -89,9 +88,21 @@
     }
     .toggle-row input[type="checkbox"] { accent-color: var(--neon-cyan); cursor: pointer; }
 
+    /* Unit Selector */
+    .unit-control {
+      margin-bottom: 10px;
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .unit-control label { font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.8px; }
+    .unit-select {
+      background: #090e1a; color: var(--neon-cyan); border: 1px solid var(--border);
+      border-radius: 5px; font-size: 11px; font-weight: 700; padding: 3px 6px; outline: none; cursor: pointer;
+    }
+
     /* Stats Grid */
     .stats-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;
     }
     .stat-card {
       background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);
@@ -102,7 +113,7 @@
       background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
     }
     .stat-card span { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
-    .stat-card strong { display: block; font-size: 15px; color: #fff; margin-top: 3px; font-weight: 800; font-family: monospace; }
+    .stat-card strong { display: block; font-size: 13.5px; color: #fff; margin-top: 3px; font-weight: 800; font-family: monospace; }
     .stat-green strong { color: var(--neon-green); text-shadow: 0 0 10px rgba(0, 255, 157, 0.4); }
     .stat-amber strong { color: var(--neon-amber); text-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
 
@@ -162,12 +173,12 @@
 
   <div class="hud-title">
     <h1><i class="fa-solid fa-layer-group"></i> Tea Plantation Sentinel</h1>
-    <span>EPSG:4326 / 3857 · QGIS GeoJSON Ground Truth</span>
+    <span>EPSG:4326 / 3857 · Precision Orthomosaic Analytics</span>
   </div>
 
   <div class="ai-suite" id="aiSuite">
     <div class="suite-header" onclick="toggleSuite()">
-      <h3>Vector Layers & GIS</h3>
+      <h3>Spatial Deck</h3>
       <div style="display:flex; align-items:center; gap:8px;">
         <div class="pulse-indicator"></div>
         <i class="fa-solid fa-chevron-down" id="suiteToggleIcon" style="font-size:11px; color:var(--muted);"></i>
@@ -186,15 +197,27 @@
           <input type="checkbox" id="chkGaps" checked onchange="toggleLayer('gaps', this.checked)">
         </label>
         <label class="toggle-row">
-          <span><i class="fa-solid fa-tree" style="color:var(--neon-green); margin-right:6px;"></i> Tree Annotations</span>
+          <span><i class="fa-solid fa-tree" style="color:var(--neon-green); margin-right:6px;"></i> Trees</span>
           <input type="checkbox" id="chkTrees" checked onchange="toggleLayer('trees', this.checked)">
         </label>
+      </div>
+
+      <!-- Measurement Unit Selector -->
+      <div class="unit-control">
+        <label><i class="fa-solid fa-ruler-combined"></i> Area Unit</label>
+        <select id="unitSelector" class="unit-select" onchange="updateAreaDisplays()">
+          <option value="sqm">Sq. Meters (m²)</option>
+          <option value="ha">Hectares (Ha)</option>
+          <option value="acre">Acres</option>
+          <option value="assam_dlr" selected>Assam (B-K-L)</option>
+          <option value="bigha_dec">Bigha (Decimal)</option>
+        </select>
       </div>
 
       <!-- Live Analytics Stats -->
       <div class="stats-grid">
         <div class="stat-card stat-green">
-          <span>Trees (QGIS)</span>
+          <span>Trees</span>
           <strong id="statTreeCount">0</strong>
         </div>
         <div class="stat-card stat-amber">
@@ -264,7 +287,11 @@
         `Lat: ${e.latlng.lat.toFixed(5)} | Lng: ${e.latlng.lng.toFixed(5)} | Z: ${map.getZoom()}`;
     });
 
-    // Vector GeoJSON Layer Groups
+    // Stored raw areas in square meters
+    let rawBoundaryAreaSqM = 0;
+    let rawGapAreaSqM = 0;
+
+    // Vector Layer Groups
     let boundaryLayer = L.geoJSON(null, {
       style: {
         color: '#00f0ff',
@@ -274,7 +301,7 @@
         dashArray: '5, 5'
       },
       onEachFeature: (feature, layer) => {
-        layer.bindPopup(`<b style="color:#0284c7;">Plot Boundary</b><br/>Garden Boundary Section`);
+        layer.bindPopup(`<b style="color:#0284c7;">Plot Boundary</b><br/>Garden Perimeter Area`);
       }
     }).addTo(map);
 
@@ -287,7 +314,6 @@
         dashArray: '4, 4'
       },
       onEachFeature: (feature, layer) => {
-        let areaText = feature.properties && feature.properties.area ? `${feature.properties.area} m²` : 'Calculated';
         layer.bindPopup(`<b style="color:#d97706;">Empty Plantable Patch</b><br/>Ready for Bamboo / Tea Infill`);
       }
     }).addTo(map);
@@ -305,15 +331,65 @@
       },
       onEachFeature: (feature, layer) => {
         const id = feature.properties ? (feature.properties.id || feature.properties.fid || '') : '';
-        layer.bindPopup(`<b style="color:#059669;">Tea Tree Crown</b><br/>QGIS Vector Point: ${id}`);
+        layer.bindPopup(`<b style="color:#059669;">Tree Crown</b><br/>Tree ID: ${id || 'Marked'}`);
       }
     }).addTo(map);
 
-    // Approximate planar geodesic polygon area in m²
+    // Assam DLR & Standard Area Unit Converter
+    // 1 Bigha (Assam) = 14,400 sq ft = 1,337.8038 sq m
+    // 1 Bigha = 5 Katha (1 Katha = 267.56 sq m)
+    // 1 Katha = 20 Lessa (1 Lessa = 13.378 sq m)
+    function formatAreaByUnit(sqmMeters, unit) {
+      if (!sqmMeters || sqmMeters <= 0) return `0 ${unit}`;
+
+      switch (unit) {
+        case 'sqm':
+          return `${Math.round(sqmMeters).toLocaleString()} m²`;
+
+        case 'ha':
+          return `${(sqmMeters / 10000).toFixed(3)} Ha`;
+
+        case 'acre':
+          return `${(sqmMeters / 4046.8564224).toFixed(3)} Acres`;
+
+        case 'bigha_dec': {
+          const bigha = sqmMeters / 1337.8038;
+          return `${bigha.toFixed(2)} Bigha`;
+        }
+
+        case 'assam_dlr': {
+          const SQM_PER_BIGHA = 1337.8038;
+          const SQM_PER_KATHA = 267.56076;
+          const SQM_PER_LESSA = 13.378038;
+
+          let rem = sqmMeters;
+          const bigha = Math.floor(rem / SQM_PER_BIGHA);
+          rem %= SQM_PER_BIGHA;
+
+          const katha = Math.floor(rem / SQM_PER_KATHA);
+          rem %= SQM_PER_KATHA;
+
+          const lessa = (rem / SQM_PER_LESSA).toFixed(1);
+
+          return `${bigha}B - ${katha}K - ${lessa}L`;
+        }
+
+        default:
+          return `${Math.round(sqmMeters).toLocaleString()} m²`;
+      }
+    }
+
+    function updateAreaDisplays() {
+      const selectedUnit = document.getElementById('unitSelector').value;
+      document.getElementById('statBoundaryArea').innerText = formatAreaByUnit(rawBoundaryAreaSqM, selectedUnit);
+      document.getElementById('statGapArea').innerText = formatAreaByUnit(rawGapAreaSqM, selectedUnit);
+    }
+
+    // Geodesic Polygon Area Calculation in m²
     function calculatePolyArea(coords) {
       if (!coords || coords.length < 3) return 0;
       let area = 0;
-      const radius = 6378137; // WGS84
+      const radius = 6378137;
       for (let i = 0; i < coords.length; i++) {
         let p1 = coords[i];
         let p2 = coords[(i + 1) % coords.length];
@@ -338,20 +414,18 @@
           });
         }
       });
-      return Math.round(totalArea);
+      return totalArea;
     }
 
-    // Load QGIS GeoJSON Files
+    // Load GeoJSON Layers
     async function loadGeoJSONData() {
       try {
-        // 1. Boundary.geojson
         const boundaryRes = await fetch('./Boundary.geojson');
         if (boundaryRes.ok) {
           const boundaryData = await boundaryRes.json();
           boundaryLayer.clearLayers();
           boundaryLayer.addData(boundaryData);
-          const bArea = computeLayerArea(boundaryData);
-          document.getElementById('statBoundaryArea').innerText = bArea > 0 ? `${bArea.toLocaleString()} m²` : 'Active';
+          rawBoundaryAreaSqM = computeLayerArea(boundaryData);
           if (boundaryLayer.getBounds().isValid()) {
             map.fitBounds(boundaryLayer.getBounds());
           }
@@ -361,22 +435,19 @@
       }
 
       try {
-        // 2. Empty_Patch.geojson
         const patchRes = await fetch('./Empty_Patch.geojson');
         if (patchRes.ok) {
           const patchData = await patchRes.json();
           emptyPatchLayer.clearLayers();
           emptyPatchLayer.addData(patchData);
           document.getElementById('statGapCount').innerText = patchData.features ? patchData.features.length : 0;
-          const pArea = computeLayerArea(patchData);
-          document.getElementById('statGapArea').innerText = `${pArea.toLocaleString()} m²`;
+          rawGapAreaSqM = computeLayerArea(patchData);
         }
       } catch (e) {
         console.warn('Could not load Empty_Patch.geojson:', e);
       }
 
       try {
-        // 3. Tree.geojson
         const treeRes = await fetch('./Tree.geojson');
         if (treeRes.ok) {
           const treeData = await treeRes.json();
@@ -387,9 +458,10 @@
       } catch (e) {
         console.warn('Could not load Tree.geojson:', e);
       }
+
+      updateAreaDisplays();
     }
 
-    // Layer control handler
     function toggleLayer(layerName, state) {
       if (layerName === 'boundary') {
         state ? map.addLayer(boundaryLayer) : map.removeLayer(boundaryLayer);
@@ -412,7 +484,6 @@
       loadGeoJSONData();
     }
 
-    // Initialize on page load
     loadGeoJSONData();
   </script>
 </body>
