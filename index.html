@@ -64,7 +64,7 @@
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     padding: 11px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; white-space: nowrap;
-    transition: transform 0.15s ease, opacity 0.15s ease;
+    transition: transform 0.15s ease, opacity 0.15s ease; cursor: pointer; border: none;
   }
   .btn:hover { transform: translateY(-1px); }
   .btn-primary { background: linear-gradient(135deg, var(--neon-cyan), #0ea5e9); color: #00131a; }
@@ -136,15 +136,51 @@
   .feature-row p { margin-top: 4px; font-size: 13.5px; color: var(--muted); }
   @media (max-width: 760px) { .feature-grid { grid-template-columns: 1fr; } }
 
-  /* ---------- Demo ---------- */
-  .lp-demo-section .wrap > .lp-body { margin-bottom: 28px; }
-  .deck-frame {
-    position: relative; width: calc(100% - 0px); margin: 0 24px; max-width: calc(var(--maxw) - 48px);
-    height: 640px; border-radius: 20px; overflow: hidden; border: 1px solid var(--border);
-    box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+  /* ---------- Demo Section Centering ---------- */
+  .lp-demo-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
-  @media (max-width: 900px) { .deck-frame { margin: 0 16px; height: 560px; border-radius: 14px; } }
-  @media (max-width: 480px) { .deck-frame { height: 500px; } }
+  .lp-demo-section .wrap {
+    width: 100%;
+    text-align: center;
+  }
+  .lp-demo-section .wrap > .lp-body {
+    margin: 16px auto 28px auto;
+  }
+  .lp-demo-section h2 {
+    margin: 0 auto;
+  }
+
+  .deck-frame {
+    position: relative;
+    width: calc(100% - 48px);
+    max-width: var(--maxw);
+    margin: 0 auto;
+    height: 660px;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 40px rgba(0, 240, 255, 0.08);
+    background: #020408;
+  }
+
+  /* Fullscreen styles */
+  .deck-frame:fullscreen,
+  .deck-frame:-webkit-full-screen,
+  .deck-frame:-moz-full-screen,
+  .deck-frame:-ms-fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+
+  @media (max-width: 900px) { .deck-frame { width: calc(100% - 32px); height: 580px; border-radius: 14px; } }
+  @media (max-width: 480px) { .deck-frame { width: calc(100% - 24px); height: 520px; } }
 
   /* ---------- Value ---------- */
   .value-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px; }
@@ -166,7 +202,7 @@
   footer { padding: 32px 0 48px; color: var(--muted); font-size: 13px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 
   /* =====================================================================
-     LIVE DECK (original tool, scoped inside .deck-frame)
+     LIVE DECK SCOPED STYLES
      ===================================================================== */
   .deck-frame #map { width: 100%; height: 100%; background: #020408; }
 
@@ -238,6 +274,7 @@
     letter-spacing: 0.5px; transition: all 0.2s; font-family: var(--font-body);
   }
   .deck-frame .action-btn:hover { background: #1e293b; color: #fff; border-color: var(--neon-cyan); }
+  .deck-frame .action-btn.fs-active { color: var(--neon-cyan); border-color: var(--neon-cyan); }
 
   .deck-frame .hud-bottom {
     position: absolute; bottom: 14px; left: 14px; z-index: 1000;
@@ -461,6 +498,7 @@
           <div class="action-row">
             <button class="action-btn" onclick="zoomToBoundary()"><i class="fa-solid fa-expand"></i> Fit Site</button>
             <button class="action-btn" onclick="reloadLayers()"><i class="fa-solid fa-rotate-right"></i> Reload</button>
+            <button class="action-btn" id="btnFullscreen" onclick="toggleFullscreen()"><i class="fa-solid fa-up-right-and-down-left-from-center" id="fsIcon"></i> <span id="fsLabel">Full</span></button>
           </div>
         </div>
       </div>
@@ -540,10 +578,10 @@
     const map = L.map('map', {
       center: SITE_CENTER,
       zoom: 18,
-      minZoom: 16,            // Locked minimum zoom
-      maxZoom: 21,            // Locked maximum zoom
-      maxBounds: SITE_BOUNDS.pad(0.25), // Restricts panning outside the garden area
-      maxBoundsViscosity: 1.0,           // Prevents bouncing away from bounds
+      minZoom: 16,
+      maxZoom: 21,
+      maxBounds: SITE_BOUNDS.pad(0.25),
+      maxBoundsViscosity: 1.0,
       zoomControl: false,
       attributionControl: false
     });
@@ -593,6 +631,58 @@
       deckObserver.observe(document.getElementById('deckFrame'));
     }
 
+    /* ---------- Fullscreen Toggle Logic ---------- */
+    const deckFrame = document.getElementById('deckFrame');
+    const fsIcon = document.getElementById('fsIcon');
+    const fsLabel = document.getElementById('fsLabel');
+    const btnFullscreen = document.getElementById('btnFullscreen');
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+        if (deckFrame.requestFullscreen) {
+          deckFrame.requestFullscreen();
+        } else if (deckFrame.webkitRequestFullscreen) {
+          deckFrame.webkitRequestFullscreen();
+        } else if (deckFrame.mozRequestFullScreen) {
+          deckFrame.mozRequestFullScreen();
+        } else if (deckFrame.msRequestFullscreen) {
+          deckFrame.msRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+          document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+          document.msExitFullscreen();
+        }
+      }
+    }
+
+    function handleFullscreenChange() {
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+      if (isFs) {
+        fsIcon.className = "fa-solid fa-down-left-and-up-right-to-center";
+        fsLabel.innerText = "Exit";
+        btnFullscreen.classList.add('fs-active');
+      } else {
+        fsIcon.className = "fa-solid fa-up-right-and-down-left-from-center";
+        fsLabel.innerText = "Full";
+        btnFullscreen.classList.remove('fs-active');
+      }
+      setTimeout(() => {
+        map.invalidateSize();
+        centerSiteInView();
+      }, 250);
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
     function setText(ids, text) {
       ids.forEach(id => { const el = document.getElementById(id); if (el) el.innerText = text; });
     }
@@ -623,6 +713,20 @@
         layer.bindPopup(`<b style="color:#059669;">Tree Crown</b><br/>Tree ID: ${id || 'Marked'}`);
       }
     }).addTo(map);
+
+    function centerSiteInView() {
+      const bounds = (boundaryLayer.getLayers().length > 0 && boundaryLayer.getBounds().isValid())
+        ? boundaryLayer.getBounds()
+        : SITE_BOUNDS;
+
+      // Offset padding for large screens so the garden is centered in visible space beside the Spatial Deck panel
+      const isDesktop = window.innerWidth > 768;
+      map.fitBounds(bounds, {
+        paddingTopLeft: [40, 40],
+        paddingBottomRight: [isDesktop ? 330 : 40, 40],
+        maxZoom: 19
+      });
+    }
 
     // Assam DLR: 1 Bigha = 14,400 sq ft = 1,337.8038 sq m; 1 Bigha = 5 Katha; 1 Katha = 20 Lessa
     function formatAreaByUnit(sqmMeters, unit) {
@@ -691,8 +795,8 @@
           plantedLayer.clearLayers(); plantedLayer.addData(boundaryData);
           rawBoundaryAreaSqM = computeLayerArea(boundaryData);
           if (boundaryLayer.getBounds().isValid()) {
-            map.fitBounds(boundaryLayer.getBounds());
-            map.setMaxBounds(boundaryLayer.getBounds().pad(0.2));
+            map.setMaxBounds(boundaryLayer.getBounds().pad(0.3));
+            centerSiteInView();
           }
         }
       } catch (e) { console.warn('Could not load Boundary.geojson:', e); }
@@ -729,11 +833,7 @@
     }
 
     function zoomToBoundary() {
-      if (boundaryLayer.getLayers().length > 0 && boundaryLayer.getBounds().isValid()) {
-        map.fitBounds(boundaryLayer.getBounds());
-      } else {
-        map.fitBounds(SITE_BOUNDS);
-      }
+      centerSiteInView();
     }
 
     function reloadLayers() { loadGeoJSONData(); }
