@@ -7,7 +7,7 @@
 <meta name="description" content="Tea Plantation Sentinel turns a single drone flight over your garden into an accurate map of trees, empty patches and cultivated area, in the land units Assam and West Bengal estates already use." />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
@@ -199,7 +199,7 @@
 
   .deck-frame .ai-suite {
     position: absolute; top: 14px; right: 14px; z-index: 1000;
-    width: 300px; background: var(--card-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    width: 310px; background: var(--card-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--border); border-radius: 16px; padding: 16px;
     box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 25px rgba(0, 240, 255, 0.1);
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); font-family: var(--font-body);
@@ -212,7 +212,8 @@
     background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px;
   }
   .deck-frame .toggle-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #cbd5e1; }
-  .deck-frame .toggle-row input[type="checkbox"] { accent-color: var(--neon-cyan); cursor: pointer; }
+  .deck-frame .toggle-row input[type="checkbox"],
+  .deck-frame .toggle-row input[type="radio"] { accent-color: var(--neon-cyan); cursor: pointer; }
 
   .deck-frame .unit-control {
     margin-bottom: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
@@ -404,7 +405,22 @@
         </div>
 
         <div class="suite-body">
+          <!-- Base Map Switcher -->
           <div class="layer-controls">
+            <span style="font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.8px; margin-bottom: 4px;">Basemap Source</span>
+            <label class="toggle-row">
+              <span><i class="fa-solid fa-satellite" style="color:var(--neon-cyan); margin-right:6px;"></i> High-Res Orthomosaic</span>
+              <input type="radio" name="basemapRadio" value="ortho" checked onchange="switchBasemap(this.value)">
+            </label>
+            <label class="toggle-row">
+              <span><i class="fa-solid fa-earth-americas" style="color:#38bdf8; margin-right:6px;"></i> Google Hybrid (Georef)</span>
+              <input type="radio" name="basemapRadio" value="google_hybrid" onchange="switchBasemap(this.value)">
+            </label>
+          </div>
+
+          <!-- Feature Layers -->
+          <div class="layer-controls">
+            <span style="font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.8px; margin-bottom: 4px;">Garden Layers</span>
             <label class="toggle-row">
               <span><i class="fa-solid fa-draw-polygon" style="color:var(--neon-cyan); margin-right:6px;"></i> Garden Boundary</span>
               <input type="checkbox" id="chkBoundary" checked onchange="toggleLayer('boundary', this.checked)">
@@ -453,7 +469,7 @@
         <div id="coords-text">Lat: 27.06029 | Lng: 94.86607 | Z: 18</div>
         <div style="display:flex; align-items:center; gap:8px;">
           <span>Alpha:</span>
-          <input type="range" min="0" max="1" step="0.05" value="1" style="accent-color: var(--neon-cyan); width: 65px;" oninput="orthoLayer.setOpacity(this.value)">
+          <input type="range" min="0" max="1" step="0.05" value="1" style="accent-color: var(--neon-cyan); width: 65px;" oninput="setBasemapOpacity(this.value)">
         </div>
       </div>
     </div>
@@ -488,10 +504,11 @@
         <p class="lp-body">Share your garden's location, and we'll process a sample flight so you can see Sentinel running on your own estate before committing to anything.</p>
       </div>
       <div class="lp-contact-card">
-        <div class="lp-contact-row"><span>Email</span><a href="mailto:Rituraj.gogoi11@gmail.com">rituraj.gogoi1@gmail.com</a></div>
-        <div class="lp-contact-row"><span>Phone / WhatsApp</span><a href="tel:+91XXXXXXXXXX">+91 XXXXX XXXXX</a></div>
+        <div class="lp-contact-row"><span>Email</span><a href="mailto:Rituraj.gogoi11@gmail.com">Rituraj.gogoi11@gmail.com</a></div>
+        <div class="lp-contact-row"><span>Phone</span><a href="tel:+919365410250">+91 93654 10250</a></div>
+        <div class="lp-contact-row"><span>WhatsApp</span><a href="https://wa.me/919365410250" target="_blank" rel="noopener" style="color:var(--neon-green);"><i class="fa-brands fa-whatsapp"></i> Chat on WhatsApp</a></div>
         <div class="lp-contact-row"><span>Based in</span><span>Assam, India</span></div>
-        <a href="mailto:Rituraj.gogoi11@gmail.com?subject=Demo%20request%20-%20Tea%20Plantation%20Sentinel" class="btn btn-primary btn-block">Email us for a demo</a>
+        <a href="tel:+919365410250" class="btn btn-primary btn-block"><i class="fa-solid fa-phone"></i> Call +91 93654 10250</a>
       </div>
     </div>
   </section>
@@ -513,20 +530,25 @@
       }
     }
 
+    // Survey boundary coordinates
     const SW_CORNER = [27.05936781688538, 94.86518823860000];
     const NE_CORNER = [27.06121598240000, 94.86694912656071];
     const SITE_BOUNDS = L.latLngBounds(SW_CORNER, NE_CORNER);
     const SITE_CENTER = [(SW_CORNER[0] + NE_CORNER[0]) / 2, (SW_CORNER[1] + NE_CORNER[1]) / 2];
 
+    // Locked map with strict bounds and controlled zoom extent
     const map = L.map('map', {
       center: SITE_CENTER,
       zoom: 18,
-      minZoom: 14,
-      maxZoom: 22,
+      minZoom: 16,            // Locked minimum zoom
+      maxZoom: 21,            // Locked maximum zoom
+      maxBounds: SITE_BOUNDS.pad(0.25), // Restricts panning outside the garden area
+      maxBoundsViscosity: 1.0,           // Prevents bouncing away from bounds
       zoomControl: false,
       attributionControl: false
     });
 
+    // 1. Drone Orthomosaic Layer
     const orthoLayer = L.tileLayer('./tea/{z}/{x}/{y}.png', {
       minZoom: 14,
       maxNativeZoom: 19,
@@ -535,12 +557,33 @@
       bounds: SITE_BOUNDS
     }).addTo(map);
 
+    // 2. Google Hybrid Georeferenced Basemap Layer (Satellite + Labels/Roads)
+    const googleHybridLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      minZoom: 14,
+      maxZoom: 22,
+      attribution: 'Google Satellite'
+    });
+
+    function switchBasemap(type) {
+      if (type === 'google_hybrid') {
+        if (map.hasLayer(orthoLayer)) map.removeLayer(orthoLayer);
+        if (!map.hasLayer(googleHybridLayer)) map.addLayer(googleHybridLayer);
+      } else {
+        if (map.hasLayer(googleHybridLayer)) map.removeLayer(googleHybridLayer);
+        if (!map.hasLayer(orthoLayer)) map.addLayer(orthoLayer);
+      }
+    }
+
+    function setBasemapOpacity(val) {
+      orthoLayer.setOpacity(val);
+      googleHybridLayer.setOpacity(val);
+    }
+
     map.on('mousemove', (e) => {
       document.getElementById('coords-text').innerText =
         `Lat: ${e.latlng.lat.toFixed(5)} | Lng: ${e.latlng.lng.toFixed(5)} | Z: ${map.getZoom()}`;
     });
 
-    // Fix Leaflet sizing since the map now sits inside a scrolled page section, not a full-viewport app
     window.addEventListener('load', () => setTimeout(() => map.invalidateSize(), 250));
     window.addEventListener('resize', () => map.invalidateSize());
     if ('IntersectionObserver' in window) {
@@ -550,7 +593,6 @@
       deckObserver.observe(document.getElementById('deckFrame'));
     }
 
-    // Helper: write the same value into one or more element ids (used to mirror data into the hero readout)
     function setText(ids, text) {
       ids.forEach(id => { const el = document.getElementById(id); if (el) el.innerText = text; });
     }
@@ -648,7 +690,10 @@
           boundaryLayer.clearLayers(); boundaryLayer.addData(boundaryData);
           plantedLayer.clearLayers(); plantedLayer.addData(boundaryData);
           rawBoundaryAreaSqM = computeLayerArea(boundaryData);
-          if (boundaryLayer.getBounds().isValid()) map.fitBounds(boundaryLayer.getBounds());
+          if (boundaryLayer.getBounds().isValid()) {
+            map.fitBounds(boundaryLayer.getBounds());
+            map.setMaxBounds(boundaryLayer.getBounds().pad(0.2));
+          }
         }
       } catch (e) { console.warn('Could not load Boundary.geojson:', e); }
 
@@ -684,8 +729,11 @@
     }
 
     function zoomToBoundary() {
-      if (boundaryLayer.getLayers().length > 0 && boundaryLayer.getBounds().isValid()) map.fitBounds(boundaryLayer.getBounds());
-      else map.fitBounds(SITE_BOUNDS);
+      if (boundaryLayer.getLayers().length > 0 && boundaryLayer.getBounds().isValid()) {
+        map.fitBounds(boundaryLayer.getBounds());
+      } else {
+        map.fitBounds(SITE_BOUNDS);
+      }
     }
 
     function reloadLayers() { loadGeoJSONData(); }
